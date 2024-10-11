@@ -5,7 +5,8 @@ Major phases of analysis:
 - [lexical](/), 
 - [syntax](/),
 - [semantic](/).
+<hr>
 Major phases of synthesis:
-- intermediate code generation,
-- optimization,
-- target code generation.
+- [intermediate code generation](/),
+- [optimization](/),
+- [target code generation](/).
