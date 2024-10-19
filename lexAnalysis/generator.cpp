@@ -1,3 +1,4 @@
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <sstream>
@@ -26,6 +27,8 @@ class Rule {
 	std::vector<std::string> get_args() const { return args; }
 };
 
+int global_state;
+
 class Automata {
   public:
 	Rule rule;
@@ -33,7 +36,7 @@ class Automata {
 	int accepted;
 	int state_count;
 	std::unordered_set<int> states;
-	std::map<std::pair<int, int>, std::vector<char>> transitions;
+	std::multimap<std::pair<int, char>, int> transitions;
 
   public:
 	Automata(Rule rule) {
@@ -45,16 +48,18 @@ class Automata {
 	}
 
 	void new_trans(std::pair<int, int> states, char sign) {
-		if (transitions.count(states) > 0) {
-			transitions.at(states).push_back(sign);
-		} else {
-			transitions.emplace(states, sign);
-		}
+		int current = states.first;
+		int next = states.second;
+		std::pair<int, char> pair = std::make_pair(current, sign);
+		transitions.emplace(pair, next);
 	}
 
 	int new_state() {
+
 		++this->state_count;
-		return this->state_count - 1;
+		this->states.insert(global_state);
+		++global_state;
+		return global_state - 1;
 	}
 	bool is_operator(std::string exp, int i) {
 		int cnt = 0;
@@ -199,11 +204,12 @@ std::string reg_def(std::string value) {
 }
 
 int main(void) {
+	global_state = 0;
 	std::string line;
 	std::string read_state = "reg_def";
 	std::string state_input;
 	std::string regex_input;
-	std::vector<std::string> args(3, "");
+	std::vector<std::string> args(4, "");
 
 	int arg_num = 0;
 	while (std::getline(std::cin, line)) {
@@ -241,7 +247,7 @@ int main(void) {
 		} else {
 			if (line.at(0) == '{') {
 				arg_num = 0;
-				args = {"", "", ""};
+				args = {"", "", "", ""};
 				continue;
 			} else if (line.at(0) == '}') {
 				Rule currRule(state_input, regex_input, args);
@@ -262,14 +268,53 @@ int main(void) {
 			}
 		}
 	}
-	for (auto x : atms) {
-		for (auto y : x.transitions) {
-			auto z = y.first;
-			for (auto w : y.second) {
-				std::cout << z.first << "->" << z.second << w << std::endl;
+	std::ofstream file("analizator/automat.tab");
+	if (file.is_open()) {
+		for (auto x : atms) {
+			file << x.rule.get_state() << "\n";
+			for (auto y : x.rule.get_args()) {
+				file << y << '\n';
+			}
+
+			// file << "STATE_COUNT " << x.state_count << '\n';
+			// file << "STATES\n";
+			// for (auto y : x.states) {
+			// 	file << y << '\n';
+			// }
+			file << "START " << x.start << '\n';
+			file << "ACCEPTED " << x.accepted << '\n';
+			file << "TRANSITIONS\n";
+			for (auto y : x.transitions) {
+				auto z = y.first;
+				if (z.second == '\n') {
+					file << z.first << ' ' << "|n" << ' ' << y.second << '\n';
+					continue;
+				} else if (z.second == '\t') {
+					file << z.first << ' ' << "|t" << ' ' << y.second << '\n';
+					continue;
+				} else if (z.second == ' ') {
+					file << z.first << ' ' << "|_" << ' ' << y.second << '\n';
+					continue;
+
+				} else {
+					file << z.first << ' ' << z.second << ' ' << y.second
+						 << '\n';
+				}
 			}
 		}
+	} else {
+		std::cerr << "Unable to open file.\n";
 	}
+	file.close();
+
+	// for (auto x : atms) {
+	// 	for (auto y : x.transitions) {
+	// 		auto z = y.first;
+	// 		for (auto w : y.second) {
+	// 			std::cout << z.first << "->" << z.second << w << std::endl;
+	// 		}
+	// 	}
+	// }
 	// for (auto reg : regexes) {
 	// 	std::cout << reg.first << ": " << reg.second << std::endl;
 	// }

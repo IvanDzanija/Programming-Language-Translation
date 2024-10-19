@@ -1,0 +1,6 @@
+NAZIV -> ime leksičke jedinke/uniformnog znaka u koje sse grupira zadana jedinka
+NOVI REDAK -> trenutna leksička jedinka je zadnja u zapisanom retku
+UDJI_U_STANJE S_stanje -> prebaci se u zadano stanje (S_stanje) leksičkog analizatora
+VRATI SE naZnak -> znakovi od 0 do naZnak se grupiraju u zadani uniformni znak, ostaka se vraća u ulazni niz
+ 
+
