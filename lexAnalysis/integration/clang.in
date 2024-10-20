@@ -13,7 +13,7 @@ int main(void) {
     const char x[] = "\"tes\"t2\"";
     int xYz, abc;
     int i;
-    
+
     xYz = 12345; // nekakav komentar
     abc = xYz;
     abc = (xYz);
@@ -21,7 +21,7 @@ int main(void) {
     abc = 054 % 5;
     abc = 0xaafff;
     i = 3*2+5-3|3&3^3;
-    
+
     tmp[1] = 'b';
     tmp[2] = '\n';
     tmp[3] = '''; // leksicka greska
@@ -34,16 +34,16 @@ int main(void) {
         continue;
         return xYz;
     }
-    
+
     if (1>=3 && i>2 || i<=12) {
         fun(3);
     } else {
         fun(5);
     }
-    
+
     while (1) {
         break;
     }
-    
+
     return 0;
 }

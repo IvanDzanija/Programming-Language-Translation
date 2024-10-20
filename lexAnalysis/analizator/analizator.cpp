@@ -1,10 +1,12 @@
 #include <algorithm>
+#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <set>
 #include <stack>
 #include <string>
+#include <thread>
 #include <vector>
 using ll = int64_t;
 
@@ -42,7 +44,10 @@ std::set<int> epsi_closure(std::set<int> states, int index) {
 	while (!stack.empty()) {
 		int top = stack.top();
 		stack.pop();
-		auto range = ts.equal_range(std::make_pair(top, '$'));
+		if (res.count(top) == 0) {
+			res.insert(top);
+		}
+		auto range = ts.equal_range(std::make_pair(top, (unsigned char)0));
 		for (auto it = range.first; it != range.second; ++it) {
 			if (res.count(it->second) == 0) {
 				stack.push(it->second);
@@ -79,8 +84,7 @@ std::set<int> transitions(std::set<int> set, char sign, int index) {
 
 int main(void) {
 	std::string line;
-	std::ifstream automata_tab("automat.tab");
-
+	std::ifstream automata_tab("automat.txt");
 	std::vector<std::string> lex_states;
 	if (automata_tab.is_open()) {
 		std::string line;
@@ -125,6 +129,7 @@ int main(void) {
 				int first = std::stoi(line.substr(0, line.find(' ')));
 				line = line.substr(line.find(' ') + 1);
 				std::string sign = (line.substr(0, line.find(' ')));
+
 				char real_sign;
 				if (sign == "|n") {
 					real_sign = '\n';
@@ -166,35 +171,117 @@ int main(void) {
 	// 	}
 	// }
 
-	std::string curr_lex_state = ndfas.at(0).lex_state;
-	std::set<int> atm_states = ndfas.at(0).start;
-	std::set<int> R = epsi_closure(atm_states, 0);
-	std::set<int> F = ndfas.at(0).acc;
-
-	int line_counter = 0;
+	std::string input;
 	while (std::getline(std::cin, line)) {
-		int last = 0;
-		int first = 0;
-		int second = 0;
-		char reading;
-		int accepted_expr;
-		while (last < line.size()) {
-			std::set<int> inter = intersect(R, F);
-			if (!R.empty() && inter.empty()) {
-				reading = line.at(last);
-				++last;
-				std::set<int> Q(R);
-				int ind = find_index(curr_lex_state);
-				R = epsi_closure(transitions(Q, reading, ind), ind);
-			} else if (!inter.empty()) {
-				accepted_expr = *inter.begin();
-				second = last;
-				++last;
-				std::set<int> Q(R);
-				reading = line.at(last);
-				int ind = find_index(curr_lex_state);
-				R = epsi_closure(transitions(Q, reading, ind), ind);
+		input.append(line);
+		input.push_back('\n');
+	}
+	input.push_back((unsigned char)1);
+	line = input;
+	int lex_state_index = 0;
+	std::string curr_lex_state = ndfas.at(lex_state_index).lex_state;
+	std::set<int> atm_states = ndfas.at(lex_state_index).start;
+	std::set<int> R = epsi_closure(atm_states, lex_state_index);
+	std::set<int> F = ndfas.at(lex_state_index).acc;
+
+	int last = 0;
+	int first = 0;
+	int second = 0;
+	char reading;
+	int accepted_expr = -1;
+
+	int line_counter = 1;
+	while (last < line.size()) {
+		// std::this_thread::sleep_for(std::chrono::seconds(1));
+		// std::cout << curr_lex_state << std::endl;
+		// std::cout << lex_state_index << std::endl;
+
+		std::set<int> inter = intersect(R, F);
+		// for (auto zed : inter) {
+		// 	std::cout << zed << ' ';
+		// }
+		// std::cout << "R = " << R.size() << " inter = " << inter.size() << ' '
+		// 		  << accepted_expr << std::endl;
+		if (!R.empty() && inter.empty()) {
+			reading = line.at(last);
+			++last;
+			std::set<int> Q(R);
+			R = epsi_closure(transitions(Q, reading, lex_state_index),
+							 lex_state_index);
+			// std::cout << "Not found yet" << std::endl;
+			// std::cout << reading << std::endl;
+		} else if (!inter.empty()) {
+			// std::cout << "postoji lex " << *inter.begin() << std::endl;
+			accepted_expr = *inter.begin();
+			second = last - 1;
+			reading = line.at(last);
+			++last;
+			std::set<int> Q(R);
+			R = epsi_closure(transitions(Q, reading, lex_state_index),
+							 lex_state_index);
+			// std::cout << reading << std::endl;
+		} else if (R.empty() && accepted_expr != -1) {
+			// std::cout << "tuuuu" << std::endl;
+			// std::cout << accepted_expr << std::endl;
+			int argument_ind = 0;
+			auto x = ndfas.at(lex_state_index).acc.begin();
+			while (*x != accepted_expr) {
+				++argument_ind;
+				x = std::next(x);
 			}
+			// std::cout << argument_ind << std::endl;
+			std::vector<std::string> arguments =
+				ndfas.at(lex_state_index).args.at(argument_ind);
+			bool is_unit = false;
+			std::string lex_unit;
+			for (auto y : arguments) {
+				// std::cout << y << std::endl;
+				if (y == "-") {
+					is_unit = false;
+					continue;
+				} else if (y == "NOVI_REDAK") {
+					++line_counter;
+					continue;
+				} else if (y.substr(0, y.find(' ')) == "UDJI_U_STANJE") {
+					curr_lex_state = y.substr(y.find(' ') + 1);
+					continue;
+				} else if (y.substr(0, y.find(' ')) == "VRATI_SE") {
+					second = std::stoi(y.substr(y.find(' ') + 1)) - 1;
+					continue;
+				} else {
+					is_unit = true;
+					lex_unit = y;
+				}
+			}
+			if (is_unit) {
+				std::cout << lex_unit << ' ' << line_counter << ' '
+						  << line.substr(first, second - first + 1)
+						  << std::endl;
+			}
+
+			line = line.substr(second + 1);
+			first = last = second = 0;
+			lex_state_index = find_index(curr_lex_state);
+			atm_states = ndfas.at(lex_state_index).start;
+			R = epsi_closure(atm_states, lex_state_index);
+			F = ndfas.at(lex_state_index).acc;
+			accepted_expr = -1;
+
+			// std::cout << line << std::endl;
+			// std::cout << ' ' << first << ' ' << second << ' '
+			// 		  << last << std::endl;
+			// std::cout << "R = " << g++ R.size() << " F = " << F.size()
+			// 		  << std::endl;
+		} else if (R.empty() && accepted_expr == -1) {
+			// std::cout << "izbacujem " << line.at(0) << std::endl;
+			// std::cout << curr_lex_state << std::endl;
+			line = line.substr(1);
+			first = last = second = 0;
+			lex_state_index = find_index(curr_lex_state);
+			atm_states = ndfas.at(lex_state_index).start;
+			R = epsi_closure(atm_states, lex_state_index);
+			F = ndfas.at(lex_state_index).acc;
+			accepted_expr = -1;
 		}
 	}
 

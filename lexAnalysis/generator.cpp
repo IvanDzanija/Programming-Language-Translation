@@ -93,8 +93,9 @@ class Automata {
 		if (choices.size() > 0) {
 			for (int i = 0; i < choices.size(); ++i) {
 				std::pair<int, int> temp = convert(choices.at(i));
-				new_trans(std::make_pair(first, temp.first), '$');
-				new_trans(std::make_pair(second, temp.second), '$');
+				new_trans(std::make_pair(first, temp.first), (unsigned char)0);
+				new_trans(std::make_pair(temp.second, second),
+						  (unsigned char)0);
 			}
 		} else {
 			bool prefixed = false;
@@ -124,7 +125,11 @@ class Automata {
 					if (expr.at(i) != '(') {
 						a = new_state();
 						b = new_state();
-						new_trans(std::make_pair(a, b), expr.at(i));
+						if (expr.at(i) == '$') {
+							new_trans(std::make_pair(a, b), (unsigned char)0);
+						} else {
+							new_trans(std::make_pair(a, b), expr.at(i));
+						}
 					} else {
 						bool closed_bracket = false;
 						int nested_brackets = 0;
@@ -159,16 +164,16 @@ class Automata {
 					int y = b;
 					a = new_state();
 					b = new_state();
-					new_trans(std::make_pair(a, x), '$');
-					new_trans(std::make_pair(y, b), '$');
-					new_trans(std::make_pair(a, b), '$');
-					new_trans(std::make_pair(y, x), '$');
+					new_trans(std::make_pair(a, x), (unsigned char)0);
+					new_trans(std::make_pair(y, b), (unsigned char)0);
+					new_trans(std::make_pair(a, b), (unsigned char)0);
+					new_trans(std::make_pair(y, x), (unsigned char)0);
 					++i;
 				}
-				new_trans(std::make_pair(last_state, a), '$');
+				new_trans(std::make_pair(last_state, a), (unsigned char)0);
 				last_state = b;
 			}
-			new_trans(std::make_pair(last_state, second), '$');
+			new_trans(std::make_pair(last_state, second), (unsigned char)0);
 		}
 
 		return std::make_pair(first, second);
@@ -268,7 +273,7 @@ int main(void) {
 			}
 		}
 	}
-	std::ofstream file("analizator/automat.tab");
+	std::ofstream file("analizator/automat.txt");
 	if (file.is_open()) {
 		for (auto x : atms) {
 			file << x.rule.get_state() << "\n";
