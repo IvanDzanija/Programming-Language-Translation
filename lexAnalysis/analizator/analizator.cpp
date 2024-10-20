@@ -90,7 +90,7 @@ int main(void) {
 		std::string line;
 		int read_trans = 0;
 		int read_args = 0;
-		int index;
+		int index = 0;
 		std::vector<std::string> current_args;
 		while (std::getline(automata_tab, line)) {
 			if (line.substr(0, 2) == "S_") {
@@ -275,6 +275,7 @@ int main(void) {
 		} else if (R.empty() && accepted_expr == -1) {
 			// std::cout << "izbacujem " << line.at(0) << std::endl;
 			// std::cout << curr_lex_state << std::endl;
+			std::cerr << line.at(0) << std::endl;
 			line = line.substr(1);
 			first = last = second = 0;
 			lex_state_index = find_index(curr_lex_state);
