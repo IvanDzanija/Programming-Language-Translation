@@ -1,0 +1,11 @@
+%V <S> <A>
+%T a b
+%Syn OPERAND UMINUS LIJEVA_ZAGRADA
+<S>
+ <A>
+<A>
+ <B> <A>
+ $
+<B>
+ a <B>
+ b
