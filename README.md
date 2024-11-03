@@ -4,7 +4,7 @@ Software implementation of specific parts of a compiler or a compiler in general
 ### Major phases of analysis: 
 - [lexical](/lexAnalysis)
 - [syntax](/synAnalysis)
-- [semantic](/)<br>
+- [semantic](/semAnalysis)<br>
 ### Major phases of synthesis:
 - [intermediate code generation](/)
 - [optimization](/)
