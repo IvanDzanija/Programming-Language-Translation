@@ -1,6 +1,8 @@
+#include <cstddef>
 #include <iostream>
 #include <map>
 #include <queue>
+#include <set>
 #include <string>
 #include <vector>
 using ll = int64_t;
@@ -79,35 +81,57 @@ class NDFA {
 			q.push(initials.first->second);
 			initials.first = std::next(initials.first);
 		}
+		std::set<int> visited;
 		while (!q.empty()) {
 			atm_state = q.front();
 			std::vector<std::string> state = states[atm_state];
 			q.pop();
-			for (size_t i = 0; i < state.size(); ++i) {
-				std::string current_sign = state[i];
-				if (current_sign == "." && i + 1 < state.size()) {
-					auto new_states = left_states.equal_range(state[i + 1]);
-					while (new_states.first != new_states.second) {
-						if (is_starter(new_states.first->second)) {
-							this->transitions.emplace(std::make_pair(
-								std::make_pair(atm_state, "EPSILON"),
-								new_states.first->second));
-							// q.push(new_states.first->second);
-						}
-						std::string left_side = states_left[atm_state];
-						auto found = states.equal_range(left_side);
-						while (found.first != found.second) {
-							found.first->
-							// std::vector<std::string> current_right =
-							// 	found.first->second
-						}
-
-						new_states.first = std::next(new_states.first);
+			if (visited.count(atm_state)) {
+				continue;
+			}
+			visited.insert(atm_state);
+			size_t i = 0;
+			for (; i < state.size() && state.at(i) != "."; ++i)
+				;
+			std::string current_sign = state[i];
+			if (i + 1 < state.size()) {
+				auto new_states = left_states.equal_range(state.at(i + 1));
+				while (new_states.first != new_states.second) {
+					if (is_starter(new_states.first->second)) {
+						this->transitions.emplace(
+							std::make_pair(std::make_pair(atm_state, "EPSILON"),
+										   new_states.first->second));
+						q.push(new_states.first->second);
 					}
+					new_states.first = std::next(new_states.first);
+				}
+
+				std::string left_side = states_left[atm_state];
+				auto found = left_states.equal_range(left_side);
+				while (found.first != found.second) {
+					if (found.first->second == atm_state) {
+						found.first = std::next(found.first);
+						continue;
+					}
+					std::vector<std::string> reading_states =
+						states[found.first->second];
+					size_t j = 0;
+					for (; j < reading_states.size() &&
+						   reading_states.at(j) != ".";
+						 ++j)
+						;
+					if (j > 0 && reading_states.at(j - 1) == state.at(i + 1)) {
+						this->transitions.emplace(std::make_pair(
+							std::make_pair(atm_state, reading_states.at(j - 1)),
+							found.first->second));
+						q.push(found.first->second);
+					}
+					// std::vector<std::string> current_right =
+					// 	found.first->second
+					found.first = std::next(found.first);
 				}
 			}
 		}
-
 		return;
 	}
 	void get_contexts() {
@@ -147,7 +171,7 @@ class NDFA {
 		get_states();
 		// print_states();
 		// print_states_left();
-		// get_transitions();
+		get_transitions();
 		// print_transitions();
 		get_contexts();
 	}
