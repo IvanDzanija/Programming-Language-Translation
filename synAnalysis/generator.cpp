@@ -4,12 +4,17 @@
 #include <queue>
 #include <set>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 using ll = int64_t;
 
 class NDFA {
   private:
-	// initial productions
+	// initial productions and symbols
+	std::unordered_set<std::string> terminals;
+	std::unordered_set<std::string> non_terminals;
+	std::unordered_set<std::string> sync;
 	std::multimap<std::string, std::vector<std::string>> productions;
 	std::string starting_production;
 
@@ -24,9 +29,16 @@ class NDFA {
 	std::multimap<std::string, int> left_states;
 	std::map<int, std::string> states_left;
 	// right context saved to position of production index
-	std::vector<std::vector<std::string>> right_context;
+	std::map<int, std::set<std::string>> right_context;
 	// map of transitions
 	std::multimap<std::pair<int, std::string>, int> transitions;
+
+	// hash set of empty non terminal symbols
+	std::unordered_set<std::string> empty_symbols;
+	// hash map of immediate starts of non terminal symbols
+	std::unordered_map<std::string, std::vector<std::string>> immediate_starts;
+	// hash map of all posible starts of non terminal symbols
+	std::unordered_map<std::string, std::vector<std::string>> symbol_starts;
 
 	int new_state() { return ++this->state_count - 1; }
 
@@ -34,6 +46,89 @@ class NDFA {
 		std::vector<std::string> state = states[check];
 		return state.at(0) == ".";
 	}
+
+	void find_empty_symbols() {
+		std::queue<std::string> q;
+		for (auto production : productions) {
+			for (auto right_element : production.second) {
+				if (right_element == "$") {
+					this->empty_symbols.insert(production.first);
+				}
+			}
+		}
+		size_t previous_size = 0;
+		size_t new_size = this->empty_symbols.size();
+		while (previous_size != new_size) {
+			for (auto production : productions) {
+				size_t right_side_size = production.second.size();
+				for (auto right_element : production.second) {
+					if (this->empty_symbols.count(right_element)) {
+						--right_side_size;
+					}
+				}
+				if (right_side_size == 0) {
+					this->empty_symbols.insert(production.first);
+				}
+			}
+			previous_size = new_size;
+			new_size = this->empty_symbols.size();
+		}
+	}
+
+	void find_immediate_starts() {
+		find_empty_symbols();
+		for (auto production : productions) {
+			std::string left = production.first;
+			std::vector<std::string> right = production.second;
+			if (right.size() == 1 && right.at(0) == "$") {
+				continue;
+			}
+			this->immediate_starts[left].push_back(right.at(0));
+			for (size_t i = 0;
+				 i < right.size() - 1 && empty_symbols.count(right.at(i));
+				 ++i) {
+				this->immediate_starts[left].push_back(right.at(i + 1));
+			}
+		}
+	}
+
+	void find_starts_symbols() {
+		find_immediate_starts();
+		for (auto table : this->immediate_starts) {
+			std::string left = table.first;
+			this->symbol_starts[left].push_back(left);
+			std::vector<std::string> right = table.second;
+			for (size_t i = 0; i < right.size(); ++i) {
+				std::string current_right = right.at(i);
+				this->symbol_starts[left].push_back(current_right);
+				if (this->immediate_starts.count(current_right)) {
+					std::vector<std::string> additions =
+						this->immediate_starts[current_right];
+					std::queue<std::string> q;
+					std::set<std::string> visited;
+					for (size_t j = 0; j < additions.size(); ++j) {
+						q.push(additions.at(j));
+					}
+					while (!q.empty()) {
+						std::string current = q.front();
+						q.pop();
+						if (visited.count(current)) {
+							continue;
+						}
+						visited.insert(current);
+						this->symbol_starts[left].push_back(current);
+						std::vector<std::string> news =
+							this->immediate_starts[current];
+						for (auto x : news) {
+							q.push(x);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	void find_starts() { find_starts_symbols(); }
 
 	void get_states() {
 		for (auto production : productions) {
@@ -135,12 +230,34 @@ class NDFA {
 		return;
 	}
 	void get_contexts() {
-		std::queue<std::pair<int, std::string>> q;
+		/* provjeriti samo episilon prijelaze
+		ako je znak A->.BA ==> desni kontekst = ZAPOČINJE(a)
+		+ ako A može otići u prazan niz onda moramo i očuvati dosadašnji
+		 */
+		find_starts();
+		// int atm_state = start;
+		// std::queue<int> q;
+		// auto initials =
+		// 	transitions.equal_range(std::make_pair(atm_state, "EPSILON"));
+		// while (initials.first != initials.second) {
+		// 	q.push(initials.first->second);
+		// 	initials.first = std::next(initials.first);
+		// }
+		// std::set<int> visited;
+		// while (!q.empty()) {
+		// 	atm_state = q.front();
+		// 	std::vector<std::string> state = states[atm_state];
+		// 	q.pop();
+		// 	if (visited.count(atm_state)) {
+		// 		continue;
+		// 	}
+		// 	visited.insert(atm_state);
+		// }
 
-		return;
+		// return;
 	}
 	void print_states() {
-		for (auto state : states) {
+		for (auto state : this->states) {
 			std::cout << state.first << ": ";
 			for (auto right_side : state.second) {
 				std::cout << right_side << ' ';
@@ -150,21 +267,52 @@ class NDFA {
 		return;
 	}
 	void print_states_left() {
-		for (auto state : states_left) {
+		for (auto state : this->states_left) {
 			std::cout << state.first << ' ' << state.second << std::endl;
 		}
 	}
 	void print_transitions() {
-		for (auto transition : transitions) {
+		for (auto transition : this->transitions) {
 			std::cout << transition.first.first << " "
 					  << transition.first.second << " " << transition.second
 					  << std::endl;
 		}
 	}
+	void print_empty_symbols() {
+		for (auto symbol : this->empty_symbols) {
+			std::cout << symbol << std::endl;
+		}
+	}
+	void print_immediate_starts() {
+		for (auto table : this->immediate_starts) {
+			std::cout << table.first << ": ";
+			for (auto symb : table.second) {
+				std::cout << symb << ' ';
+			}
+
+			std::cout << std::endl;
+		}
+	}
+	void print_symbol_starts() {
+		for (auto table : this->symbol_starts) {
+			std::cout << table.first << ": ";
+			for (auto symb : table.second) {
+				std::cout << symb << ' ';
+			}
+
+			std::cout << std::endl;
+		}
+	}
 
   public:
 	NDFA(std::multimap<std::string, std::vector<std::string>> productions,
-		 std::string starting_production) {
+		 std::string starting_production,
+		 std::unordered_set<std::string> terminals,
+		 std::unordered_set<std::string> non_terminals,
+		 std::unordered_set<std::string> sync) {
+		this->terminals = terminals;
+		this->non_terminals = non_terminals;
+		this->sync = sync;
 		this->productions = productions;
 		this->starting_production = starting_production;
 		this->start = new_state();
@@ -178,9 +326,9 @@ class NDFA {
 };
 int main(void) {
 	std::string line;
-	std::vector<std::string> terminals;
-	std::vector<std::string> non_terminals;
-	std::vector<std::string> sync;
+	std::unordered_set<std::string> terminals;
+	std::unordered_set<std::string> non_terminals;
+	std::unordered_set<std::string> sync;
 	std::multimap<std::string, std::vector<std::string>> productions;
 	std::string current_sign;
 	std::string starting_production;
@@ -192,10 +340,10 @@ int main(void) {
 			// std::cout << starting_production << std::endl;
 			while (!line.empty()) {
 				if (line.find(' ') == std::string::npos) {
-					non_terminals.push_back(line);
+					non_terminals.insert(line);
 					line.clear();
 				} else {
-					non_terminals.push_back(line.substr(0, line.find(' ')));
+					non_terminals.insert(line.substr(0, line.find(' ')));
 
 					line = line.substr(line.find(' ') + 1);
 				}
@@ -209,10 +357,10 @@ int main(void) {
 			for (int i = 0; i < line.size(); ++i) {
 				while (!line.empty()) {
 					if (line.find(' ') == std::string::npos) {
-						terminals.push_back(line);
+						terminals.insert(line);
 						line.clear();
 					} else {
-						terminals.push_back(line.substr(0, line.find(' ')));
+						terminals.insert(line.substr(0, line.find(' ')));
 
 						line = line.substr(line.find(' ') + 1);
 					}
@@ -225,10 +373,10 @@ int main(void) {
 			for (int i = 0; i < line.size(); ++i) {
 				while (!line.empty()) {
 					if (line.find(' ') == std::string::npos) {
-						sync.push_back(line);
+						sync.insert(line);
 						line.clear();
 					} else {
-						sync.push_back(line.substr(0, line.find(' ')));
+						sync.insert(line.substr(0, line.find(' ')));
 
 						line = line.substr(line.find(' ') + 1);
 					}
@@ -273,7 +421,7 @@ int main(void) {
 	// 	std::cout << std::endl;
 	// }
 
-	NDFA enka(productions, starting_production);
+	NDFA enka(productions, starting_production, non_terminals, terminals, sync);
 
 	return 0;
 }
