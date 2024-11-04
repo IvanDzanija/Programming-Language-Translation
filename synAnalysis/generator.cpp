@@ -4,34 +4,31 @@
 #include <queue>
 #include <set>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+using tpl =
+	std::tuple<std::string, std::vector<std::string>, std::set<std::string>>;
 using ll = int64_t;
 
 class NDFA {
   private:
 	// initial productions and symbols
-	std::unordered_set<std::string> terminals;
 	std::unordered_set<std::string> non_terminals;
+	std::unordered_set<std::string> terminals;
 	std::unordered_set<std::string> sync;
 	std::multimap<std::string, std::vector<std::string>> productions;
 	std::string starting_production;
 
-	int start;
-	int state_count = 0;
+	// LR(1) items
+	std::set<std::vector<std::string>> items;
 
-	// all accepted states of NDFA
-	std::vector<ll> finals;
-	std::map<int, std::vector<std::string>> states;
-
-	// pairs of left-sides of production with index of state
-	std::multimap<std::string, int> left_states;
-	std::map<int, std::string> states_left;
-	// right context saved to position of production index
-	std::map<int, std::set<std::string>> right_context;
 	// map of transitions
-	std::multimap<std::pair<int, std::string>, int> transitions;
+	std::multimap<std::pair<tpl, std::string>, tpl> transitions;
+
+	// NDFA states
+	std::set<tpl> states;
 
 	// hash set of empty non terminal symbols
 	std::unordered_set<std::string> empty_symbols;
@@ -39,12 +36,13 @@ class NDFA {
 	std::unordered_map<std::string, std::vector<std::string>> immediate_starts;
 	// hash map of all posible starts of non terminal symbols
 	std::unordered_map<std::string, std::vector<std::string>> symbol_starts;
+	// hash map of all poss starts relations
+	std::unordered_map<std::string, std::vector<std::string>>
+		non_terminal_starts;
+	std::map<std::vector<std::string>, std::set<std::string>> starts;
 
-	int new_state() { return ++this->state_count - 1; }
-
-	bool is_starter(int check) {
-		std::vector<std::string> state = states[check];
-		return state.at(0) == ".";
+	bool is_starter(std::vector<std::string> to_check) {
+		return to_check.at(0) == ".";
 	}
 
 	void find_empty_symbols() {
@@ -56,11 +54,11 @@ class NDFA {
 				}
 			}
 		}
-		size_t previous_size = 0;
-		size_t new_size = this->empty_symbols.size();
+		int previous_size = 0;
+		int new_size = this->empty_symbols.size();
 		while (previous_size != new_size) {
 			for (auto production : productions) {
-				size_t right_side_size = production.second.size();
+				int right_side_size = production.second.size();
 				for (auto right_element : production.second) {
 					if (this->empty_symbols.count(right_element)) {
 						--right_side_size;
@@ -84,7 +82,7 @@ class NDFA {
 				continue;
 			}
 			this->immediate_starts[left].push_back(right.at(0));
-			for (size_t i = 0;
+			for (int i = 0;
 				 i < right.size() - 1 && empty_symbols.count(right.at(i));
 				 ++i) {
 				this->immediate_starts[left].push_back(right.at(i + 1));
@@ -98,7 +96,7 @@ class NDFA {
 			std::string left = table.first;
 			this->symbol_starts[left].push_back(left);
 			std::vector<std::string> right = table.second;
-			for (size_t i = 0; i < right.size(); ++i) {
+			for (int i = 0; i < right.size(); ++i) {
 				std::string current_right = right.at(i);
 				this->symbol_starts[left].push_back(current_right);
 				if (this->immediate_starts.count(current_right)) {
@@ -106,7 +104,7 @@ class NDFA {
 						this->immediate_starts[current_right];
 					std::queue<std::string> q;
 					std::set<std::string> visited;
-					for (size_t j = 0; j < additions.size(); ++j) {
+					for (int j = 0; j < additions.size(); ++j) {
 						q.push(additions.at(j));
 					}
 					while (!q.empty()) {
@@ -128,17 +126,49 @@ class NDFA {
 		}
 	}
 
-	void find_starts() { find_starts_symbols(); }
+	void find_starts() {
+		find_starts_symbols();
+		for (auto current : this->symbol_starts) {
+			for (auto pos : current.second) {
+				if (terminals.count(pos)) {
+					this->non_terminal_starts[current.first].push_back(pos);
+				}
+			}
+		}
+		for (auto item : items) {
+			int i = 0;
+			for (; i < item.size() && item.at(i) != "."; ++i)
+				;
+			if (i >= item.size() - 2) {
+				continue;
+			} else {
+				bool flag = false;
+				for (int j = i + 2; j < item.size() && !flag; ++j) {
+					if (terminals.count(item.at(j))) {
+						this->starts[item].insert(item.at(j));
+						flag = true;
 
-	void get_states() {
+					} else if (!empty_symbols.count(item.at(j))) {
+						for (auto temp : non_terminal_starts[item.at(j)]) {
+							this->starts[item].insert(temp);
+							flag = true;
+						}
+					} else {
+						for (auto temp : non_terminal_starts[item.at(j)]) {
+							this->starts[item].insert(temp);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	void get_items() {
 		for (auto production : productions) {
 			std::string left = production.first;
 			std::vector<std::string> right = production.second;
 			if (right.size() == 1 && right.at(0) == "$") {
-				int current_state = new_state();
-				states[current_state] = std::vector<std::string>(1, ".");
-				left_states.emplace(make_pair(left, current_state));
-				states_left.emplace(make_pair(current_state, left));
+				items.insert(std::vector<std::string>(1, "."));
 				continue;
 			}
 			std::vector<std::string> vec(right.size() + 1, "");
@@ -155,134 +185,123 @@ class NDFA {
 						++k;
 					}
 				}
-				int current_state = new_state();
-				states[current_state] = vec;
-				left_states.emplace(make_pair(left, current_state));
-				states_left.emplace(make_pair(current_state, left));
+				items.insert(vec);
 			}
 		}
+		find_starts();
 		return;
 	}
+
 	void get_transitions() {
-		int atm_state = start;
-		auto initials = left_states.equal_range(this->starting_production);
-		std::queue<int> q;
-		while (initials.first != initials.second) {
-			if (is_starter(initials.first->second)) {
-				this->transitions.emplace(
-					std::make_pair(std::make_pair(atm_state, "EPSILON"),
-								   initials.first->second));
-			}
-			q.push(initials.first->second);
-			initials.first = std::next(initials.first);
-		}
-		std::set<int> visited;
+		std::string left = "START";
+		std::vector<std::string> right = {".", starting_production};
+		std::set<std::string> context = {"END"};
+		std::queue<tpl> q;
+		q.push(std::make_tuple(left, right, context));
+
 		while (!q.empty()) {
-			atm_state = q.front();
-			std::vector<std::string> state = states[atm_state];
+			tpl front = q.front();
+			auto [l, r, c] = front;
 			q.pop();
-			if (visited.count(atm_state)) {
+			if (states.count(front)) {
 				continue;
 			}
-			visited.insert(atm_state);
-			size_t i = 0;
-			for (; i < state.size() && state.at(i) != "."; ++i)
+			states.insert(front);
+			int i = 0;
+
+			for (; i < r.size() && r.at(i) != "."; ++i)
 				;
-			std::string current_sign = state[i];
-			if (i + 1 < state.size()) {
-				auto new_states = left_states.equal_range(state.at(i + 1));
-				while (new_states.first != new_states.second) {
-					if (is_starter(new_states.first->second)) {
-						this->transitions.emplace(
-							std::make_pair(std::make_pair(atm_state, "EPSILON"),
-										   new_states.first->second));
-						q.push(new_states.first->second);
+
+			if (i + 1 < r.size()) {
+				if (l != "START") {
+					std::vector<std::string> tmp;
+					for (int j = 0; j < r.size(); ++j) {
+						if (r.at(j) == ".") {
+							continue;
+						}
+						tmp.push_back(r.at(j));
 					}
-					new_states.first = std::next(new_states.first);
+					tmp.insert(tmp.begin() + i + 1, ".");
+					tpl second_new = std::make_tuple(l, tmp, c);
+					transitions.insert(make_pair(
+						std::make_pair(front, r.at(i + 1)), second_new));
+					q.push(second_new);
 				}
 
-				std::string left_side = states_left[atm_state];
-				auto found = left_states.equal_range(left_side);
-				while (found.first != found.second) {
-					if (found.first->second == atm_state) {
-						found.first = std::next(found.first);
-						continue;
+				std::set<std::string> next_context;
+				if (i + 2 == r.size()) {
+					next_context = c;
+				} else {
+					bool checking = false;
+					bool poss = true;
+					bool helper = false;
+					for (auto it = r.begin(); it != r.end() && poss;
+						 it = std::next(it)) {
+						if (checking) {
+							if (!empty_symbols.count(*it)) {
+								poss = false;
+							}
+						}
+						if (helper) {
+							checking = true;
+						}
+						if (*it == ".") {
+							helper = true;
+						}
 					}
-					std::vector<std::string> reading_states =
-						states[found.first->second];
-					size_t j = 0;
-					for (; j < reading_states.size() &&
-						   reading_states.at(j) != ".";
-						 ++j)
-						;
-					if (j > 0 && reading_states.at(j - 1) == state.at(i + 1)) {
-						this->transitions.emplace(std::make_pair(
-							std::make_pair(atm_state, reading_states.at(j - 1)),
-							found.first->second));
-						q.push(found.first->second);
+					if (poss) {
+						for (auto x : c) {
+							next_context.insert(x);
+						}
 					}
-					// std::vector<std::string> current_right =
-					// 	found.first->second
-					found.first = std::next(found.first);
+					if (starts.count(r)) {
+						for (auto x : starts[r]) {
+							next_context.insert(x);
+						}
+					}
+				}
+
+				auto range = productions.equal_range(r.at(i + 1));
+				while (range.first != range.second) {
+					std::string next_left = range.first->first;
+					std::vector<std::string> next_right = range.first->second;
+					// for (auto x : next_right) {
+					// 	std::cout << x << ' ';
+					// }
+					// std::cout << std::endl;
+					std::vector<std::string> first_right = next_right;
+
+					first_right.insert(first_right.begin(), ".");
+					if (next_right.size() == 1 && next_right.at(0) == "$") {
+						first_right = {"."};
+					}
+
+					tpl first_new =
+						std::make_tuple(next_left, first_right, next_context);
+					if (states.count(first_new)) {
+						transitions.insert(make_pair(
+							std::make_pair(make_tuple(l, r, c), "EPSILON"),
+							first_new));
+					} else {
+						transitions.insert(make_pair(
+							std::make_pair(make_tuple(l, r, c), "EPSILON"),
+							first_new));
+						q.push(first_new);
+					}
+					range.first = std::next(range.first);
 				}
 			}
 		}
-		return;
-	}
-	void get_contexts() {
-		/* provjeriti samo episilon prijelaze
-		ako je znak A->.BA ==> desni kontekst = ZAPOČINJE(a)
-		+ ako A može otići u prazan niz onda moramo i očuvati dosadašnji
-		 */
-		find_starts();
-		// int atm_state = start;
-		// std::queue<int> q;
-		// auto initials =
-		// 	transitions.equal_range(std::make_pair(atm_state, "EPSILON"));
-		// while (initials.first != initials.second) {
-		// 	q.push(initials.first->second);
-		// 	initials.first = std::next(initials.first);
-		// }
-		// std::set<int> visited;
-		// while (!q.empty()) {
-		// 	atm_state = q.front();
-		// 	std::vector<std::string> state = states[atm_state];
-		// 	q.pop();
-		// 	if (visited.count(atm_state)) {
-		// 		continue;
-		// 	}
-		// 	visited.insert(atm_state);
-		// }
 
-		// return;
-	}
-	void print_states() {
-		for (auto state : this->states) {
-			std::cout << state.first << ": ";
-			for (auto right_side : state.second) {
-				std::cout << right_side << ' ';
-			}
-			std::cout << std::endl;
-		}
 		return;
 	}
-	void print_states_left() {
-		for (auto state : this->states_left) {
-			std::cout << state.first << ' ' << state.second << std::endl;
-		}
-	}
-	void print_transitions() {
-		for (auto transition : this->transitions) {
-			std::cout << transition.first.first << " "
-					  << transition.first.second << " " << transition.second
-					  << std::endl;
-		}
-	}
+
 	void print_empty_symbols() {
 		for (auto symbol : this->empty_symbols) {
 			std::cout << symbol << std::endl;
 		}
 	}
+
 	void print_immediate_starts() {
 		for (auto table : this->immediate_starts) {
 			std::cout << table.first << ": ";
@@ -293,6 +312,7 @@ class NDFA {
 			std::cout << std::endl;
 		}
 	}
+
 	void print_symbol_starts() {
 		for (auto table : this->symbol_starts) {
 			std::cout << table.first << ": ";
@@ -304,24 +324,76 @@ class NDFA {
 		}
 	}
 
+	void print_starts() {
+		for (auto x : starts) {
+			for (auto y : x.first) {
+				std::cout << y << ' ';
+			}
+			std::cout << ": ";
+			for (auto y : x.second) {
+				std::cout << y << ' ';
+			}
+			std::cout << std::endl;
+		}
+	}
+	void print_transitions() {
+		std::cout << transitions.size() << std::endl;
+		for (auto x : transitions) {
+			auto s = x.first.second;
+			auto [d, e, f] = x.second;
+			auto [a, b, c] = x.first.first;
+
+			std::cout << a << ":";
+			for (auto y : b) {
+				std::cout << y;
+			}
+			std::cout << "{";
+			for (auto y : c) {
+				std::cout << y;
+			}
+			std::cout << "}";
+			std::cout << " ->" + s + ": ";
+			std::cout << d << ":";
+			for (auto y : e) {
+				std::cout << y;
+			}
+			std::cout << "{";
+			for (auto y : f) {
+				std::cout << y;
+			}
+			std::cout << "}";
+			std::cout << std::endl;
+			std::cout << std::endl;
+		}
+	}
+
   public:
 	NDFA(std::multimap<std::string, std::vector<std::string>> productions,
 		 std::string starting_production,
-		 std::unordered_set<std::string> terminals,
 		 std::unordered_set<std::string> non_terminals,
+		 std::unordered_set<std::string> terminals,
 		 std::unordered_set<std::string> sync) {
 		this->terminals = terminals;
 		this->non_terminals = non_terminals;
 		this->sync = sync;
 		this->productions = productions;
 		this->starting_production = starting_production;
-		this->start = new_state();
-		get_states();
-		// print_states();
-		// print_states_left();
+
+		get_items();
 		get_transitions();
 		// print_transitions();
-		get_contexts();
+		for (auto x : this->states) {
+			auto [a, b, c] = x;
+			std::cout << a << ": ";
+			for (auto y : b) {
+				std::cout << y;
+			}
+			std::cout << "  kont: ";
+			for (auto y : c) {
+				std::cout << y;
+			}
+			std::cout << std::endl;
+		}
 	}
 };
 int main(void) {
