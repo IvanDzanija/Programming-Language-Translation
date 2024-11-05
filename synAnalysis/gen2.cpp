@@ -1,4 +1,3 @@
-#include <chrono>
 #include <iostream>
 #include <map>
 #include <queue>
@@ -16,12 +15,10 @@ using ull = uint64_t;
 
 struct PairHash {
 	ull operator()(const std::pair<int, std::string> &p) const {
-		std::string s = p.second + std::to_string(p.first);
-		ull hash = 5381;
-		for (auto c : s)
-			hash = ((hash << 5) + hash) + c;
+		std::size_t h1 = std::hash<int>{}(p.first);
+		std::size_t h2 = std::hash<std::string>{}(p.second);
 
-		return hash;
+		return h1 ^ (h2 << 1);
 	}
 };
 class ENFA {
@@ -54,9 +51,8 @@ class ENFA {
 	std::map<std::vector<std::string>, std::set<std::string>> starts;
 
 	std::set<std::set<tpl>> DFA_states;
-	std::unordered_map<int, std::set<tpl>> saver_left;
-	std::map<std::set<tpl>, int> saver_right;
-	std::unordered_map<std::pair<int, std::string>, int, PairHash>
+	std::unordered_map<std::pair<std::set<tpl>, std::string>, std::set<tpl>,
+					   PairHash>
 		DFA_transitions;
 	std::map<tpl, std::set<tpl>> memoization;
 
@@ -354,7 +350,6 @@ class ENFA {
 	}
 
 	void create_DFA() {
-		int counter = 0;
 		std::string left = "START";
 		std::vector<std::string> right = {".", starting_production};
 		std::set<std::string> context = {"END"};
@@ -366,8 +361,6 @@ class ENFA {
 			if (DFA_states.count(top)) {
 				continue;
 			}
-			saver_left[counter] = top;
-			saver_right[top] = counter;
 			DFA_states.insert(top);
 			for (auto sign : terminals) {
 				// std::cout << sign << std::endl;
@@ -377,7 +370,6 @@ class ENFA {
 						transitions.equal_range(std::make_pair(state, sign));
 					for (; range.first != range.second;
 						 range.first = std::next(range.first)) {
-
 						std::set<tpl> current_closure =
 							epsi_closure(range.first->second);
 						for (auto x : current_closure) {
@@ -387,13 +379,12 @@ class ENFA {
 				}
 				if (!transitions_states.empty()) {
 					DFA_transitions.emplace(std::make_pair(
-						std::make_pair(counter, sign), counter++));
-					saver_left[counter] = transitions_states;
-					saver_right[transitions_states] = counter;
+						std::make_pair(top, sign), transitions_states));
 					q.push(transitions_states);
 				}
 			}
 			for (auto sign : non_terminals) {
+				// std::cout << sign << std::endl;
 				std::set<tpl> transitions_states;
 				for (auto state : top) {
 					auto range =
@@ -409,9 +400,7 @@ class ENFA {
 				}
 				if (!transitions_states.empty()) {
 					DFA_transitions.emplace(std::make_pair(
-						std::make_pair(counter, sign), counter++));
-					saver_left[counter] = transitions_states;
-					saver_right[transitions_states] = counter;
+						std::make_pair(top, sign), transitions_states));
 					q.push(transitions_states);
 				}
 			}
@@ -641,6 +630,5 @@ int main(void) {
 	// }
 
 	ENFA enka(productions, starting_production, non_terminals, terminals, sync);
-
 	return 0;
 }

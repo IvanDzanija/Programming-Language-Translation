@@ -1,4 +1,3 @@
-#include <chrono>
 #include <iostream>
 #include <map>
 #include <queue>
@@ -14,16 +13,6 @@ using tpl =
 using ll = int64_t;
 using ull = uint64_t;
 
-struct PairHash {
-	ull operator()(const std::pair<int, std::string> &p) const {
-		std::string s = p.second + std::to_string(p.first);
-		ull hash = 5381;
-		for (auto c : s)
-			hash = ((hash << 5) + hash) + c;
-
-		return hash;
-	}
-};
 class ENFA {
   private:
 	// initial productions and symbols
@@ -56,8 +45,7 @@ class ENFA {
 	std::set<std::set<tpl>> DFA_states;
 	std::unordered_map<int, std::set<tpl>> saver_left;
 	std::map<std::set<tpl>, int> saver_right;
-	std::unordered_map<std::pair<int, std::string>, int, PairHash>
-		DFA_transitions;
+	std::map<std::pair<int, std::string>, int> DFA_transitions;
 	std::map<tpl, std::set<tpl>> memoization;
 
 	bool is_starter(std::vector<std::string> to_check) {
@@ -377,7 +365,6 @@ class ENFA {
 						transitions.equal_range(std::make_pair(state, sign));
 					for (; range.first != range.second;
 						 range.first = std::next(range.first)) {
-
 						std::set<tpl> current_closure =
 							epsi_closure(range.first->second);
 						for (auto x : current_closure) {
@@ -394,6 +381,7 @@ class ENFA {
 				}
 			}
 			for (auto sign : non_terminals) {
+				// std::cout << sign << std::endl;
 				std::set<tpl> transitions_states;
 				for (auto state : top) {
 					auto range =
@@ -641,6 +629,5 @@ int main(void) {
 	// }
 
 	ENFA enka(productions, starting_production, non_terminals, terminals, sync);
-
 	return 0;
 }
