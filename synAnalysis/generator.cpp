@@ -382,18 +382,6 @@ class NDFA {
 		get_items();
 		get_transitions();
 		// print_transitions();
-		for (auto x : this->states) {
-			auto [a, b, c] = x;
-			std::cout << a << ": ";
-			for (auto y : b) {
-				std::cout << y;
-			}
-			std::cout << "  kont: ";
-			for (auto y : c) {
-				std::cout << y;
-			}
-			std::cout << std::endl;
-		}
 	}
 };
 int main(void) {
