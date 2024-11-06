@@ -60,6 +60,9 @@ class ENFA {
 		DFA_transitions;
 	std::map<tpl, std::set<tpl>> memoization;
 
+	std::map<std::pair<int, std::string>, std::vector<std::string>> action;
+	std::map<std::pair<int, std::string>, int> new_state;
+
 	bool is_starter(std::vector<std::string> to_check) {
 		return to_check.at(0) == ".";
 	}
@@ -366,8 +369,14 @@ class ENFA {
 			if (DFA_states.count(top)) {
 				continue;
 			}
-			saver_left[counter] = top;
-			saver_right[top] = counter;
+			if (saver_right.count(top)) {
+				counter = saver_right.at(top);
+			}
+			if (counter == 0) {
+				saver_left[counter] = top;
+				saver_right[top] = counter;
+			}
+
 			DFA_states.insert(top);
 			for (auto sign : terminals) {
 				// std::cout << sign << std::endl;
@@ -386,10 +395,17 @@ class ENFA {
 					}
 				}
 				if (!transitions_states.empty()) {
-					DFA_transitions.emplace(std::make_pair(
-						std::make_pair(counter, sign), counter++));
-					saver_left[counter] = transitions_states;
-					saver_right[transitions_states] = counter;
+					if (saver_right.count(transitions_states)) {
+						DFA_transitions.emplace(
+							std::make_pair(std::make_pair(counter, sign),
+										   saver_right.at(transitions_states)));
+					} else {
+						int inner = saver_right.size();
+						DFA_transitions.emplace(std::make_pair(
+							std::make_pair(counter, sign), inner));
+						saver_left[inner] = transitions_states;
+						saver_right[transitions_states] = inner;
+					}
 					q.push(transitions_states);
 				}
 			}
@@ -408,12 +424,61 @@ class ENFA {
 					}
 				}
 				if (!transitions_states.empty()) {
-					DFA_transitions.emplace(std::make_pair(
-						std::make_pair(counter, sign), counter++));
-					saver_left[counter] = transitions_states;
-					saver_right[transitions_states] = counter;
+					if (saver_right.count(transitions_states)) {
+						DFA_transitions.emplace(
+							std::make_pair(std::make_pair(counter, sign),
+										   saver_right.at(transitions_states)));
+					} else {
+						int inner = saver_right.size();
+						DFA_transitions.emplace(std::make_pair(
+							std::make_pair(counter, sign), inner));
+						saver_left[inner] = transitions_states;
+						saver_right[transitions_states] = inner;
+					}
 					q.push(transitions_states);
 				}
+			}
+			++counter;
+		}
+	}
+
+	void build_tables() {
+		for (auto x : saver_left) {
+			int first_num = x.first;
+			std::set<tpl> state = x.second;
+			for (auto [l, r, c] : state) {
+				if (r.at(r.size() - 1) == ".") {
+					if (l == "START" && c.size() == 1 && *c.begin() == "END") {
+						action[std::make_pair(first_num, "END")] = {};
+					} else {
+						for (auto terminal : terminals) {
+							action[std::make_pair(first_num, terminal)]
+								.push_back(l);
+							for (auto sign : c) {
+								action[std::make_pair(first_num, terminal)]
+									.push_back(sign);
+							}
+						}
+					}
+				} else {
+					for (auto terminal : terminals) {
+						if (DFA_transitions.count(
+								std::make_pair(first_num, terminal))) {
+							int next = DFA_transitions.at(
+								std::make_pair(first_num, terminal));
+							action[std::make_pair(first_num, terminal)] = {
+								std::to_string(next)};
+						}
+					}
+				}
+			}
+		}
+		for (auto x : DFA_transitions) {
+			int first = x.first.first;
+			int second = x.second;
+			std::string s = x.first.second;
+			if (non_terminals.count(s)) {
+				new_state[std::make_pair(first, s)] = second;
 			}
 		}
 	}
@@ -518,8 +583,18 @@ class ENFA {
 		get_items();
 		get_transitions();
 		create_DFA();
-		std::cout << states.size() << std::endl;
-		std::cout << transitions.size() << std::endl;
+		build_tables();
+
+		// for (auto x : DFA_transitions) {
+		// 	int a = x.first.first;
+		// 	int b = x.second;
+		// 	std::string s = x.first.second;
+		// 	std::cout << a << ' ' << s << ' ' << b << std::endl;
+		// }
+		for (auto x : new_state) {
+			std::cout << x.first.first << ' ' << x.first.second << ' '
+					  << x.second << std::endl;
+		}
 		// for (auto x : DFA_states) {
 		// 	for (auto y : x) {
 		// 		auto [l, r, c] = y;
@@ -535,8 +610,6 @@ class ENFA {
 		// 	}
 		// 	std::cout << std::endl;
 		// }
-		std::cout << DFA_states.size() << std::endl;
-		std::cout << DFA_transitions.size() << std::endl;
 		// print_transitions();
 		// std::string left = "<A>";
 		// std::vector<std::string> right = {"<B>", ".", "<A>"};
