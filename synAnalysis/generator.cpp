@@ -26,31 +26,24 @@ struct PairHash {
 };
 class ENFA {
   private:
-	// initial productions and symbols
 	std::unordered_set<std::string> non_terminals;
 	std::unordered_set<std::string> terminals;
 	std::unordered_set<std::string> sync;
 	std::multimap<std::string, std::vector<std::string>> productions;
 	std::string starting_production;
 
-	// LR(1) items
 	std::set<std::vector<std::string>> items;
 
-	// map of transitions
 	std::multimap<std::pair<tpl, std::string>, tpl> transitions;
+	std::map<std::vector<std::string>, int> reductions;
 
-	// ENFA states
 	std::set<tpl> states;
 
-	// hash set of empty non terminal symbols
 	std::unordered_set<std::string> empty_symbols;
-	// hash map of immediate starts of non terminal symbols
 	std::unordered_map<std::string, std::unordered_set<std::string>>
 		immediate_starts;
-	// hash map of all posible starts of non terminal symbols
 	std::unordered_map<std::string, std::unordered_set<std::string>>
 		symbol_starts;
-	// hash map of all poss starts relations
 	std::unordered_map<std::string, std::unordered_set<std::string>>
 		non_terminal_starts;
 	std::map<std::vector<std::string>, std::unordered_set<std::string>> starts;
@@ -252,9 +245,9 @@ class ENFA {
 				if (i + 2 == r.size()) {
 					next_context = c;
 				} else {
-					// bool checking = false;
+
 					bool poss = true;
-					// bool helper = false;
+
 					for (auto it = r.begin() + 2; it != r.end();
 						 it = std::next(it)) {
 
@@ -278,10 +271,7 @@ class ENFA {
 				while (range.first != range.second) {
 					std::string next_left = range.first->first;
 					std::vector<std::string> next_right = range.first->second;
-					// for (auto x : next_right) {
-					// 	std::cout << x << ' ';
-					// }
-					// std::cout << std::endl;
+
 					std::vector<std::string> first_right = next_right;
 
 					first_right.insert(first_right.begin(), ".");
@@ -332,19 +322,7 @@ class ENFA {
 				range.first = std::next(range.first);
 			}
 		}
-		// for (auto x : ans) {
-		// 	auto [l, r, c] = x;
-		// 	std::cout << l << ": ";
-		// 	for (auto y : r) {
-		// 		std::cout << y;
-		// 	}
-		// 	std::cout << "  kont:";
-		// 	for (auto y : c) {
-		// 		std::cout << y;
-		// 	}
-		// 	std::cout << std::endl;
-		// }
-		// std::cout << std::endl;
+
 		memoization[state] = ans;
 		return ans;
 	}
@@ -449,12 +427,28 @@ class ENFA {
 						current_terms.insert("!END!");
 						for (auto terminal : current_terms) {
 							if (c.count(terminal)) {
-								action[std::make_pair(first_num, terminal)]
-									.push_back(l);
-								for (int i = 0; i < r.size() - 1; ++i) {
-									std::string sign = r.at(i);
-									action[std::make_pair(first_num, terminal)]
-										.push_back(sign);
+								std::vector<std::string> vec(r.begin(),
+															 r.end() - 1);
+								vec.insert(vec.begin(), l);
+								if (action.count(
+										std::make_pair(first_num, terminal)) &&
+									action.at(std::make_pair(first_num,
+															 terminal))
+											.at(0)
+											.at(0) == '<' &&
+									reductions.at(vec) >
+										reductions.at(action.at(std::make_pair(
+											first_num, terminal)))) {
+
+								} else {
+									action[std::make_pair(first_num,
+														  terminal)] = {l};
+									for (int i = 0; i < r.size() - 1; ++i) {
+										std::string sign = r.at(i);
+										action[std::make_pair(first_num,
+															  terminal)]
+											.push_back(sign);
+									}
 								}
 							}
 						}
@@ -487,63 +481,18 @@ class ENFA {
 		 std::string starting_production,
 		 std::unordered_set<std::string> non_terminals,
 		 std::unordered_set<std::string> terminals,
-		 std::unordered_set<std::string> sync) {
+		 std::unordered_set<std::string> sync,
+		 std::map<std::vector<std::string>, int> reductions) {
 		this->terminals = terminals;
 		this->non_terminals = non_terminals;
 		this->sync = sync;
 		this->productions = productions;
 		this->starting_production = starting_production;
+		this->reductions = reductions;
 		get_items();
 		get_transitions();
 		create_DFA();
 		build_tables();
-		std::cout << states.size() << std::endl;
-		std::cout << DFA_states.size() << ' ' << saver_left.size() << std::endl;
-		std::cout << transitions.size() << std::endl;
-		// DFA_transitions.size() << std::endl; for (auto x : action) { 	if
-		// (!x.second.empty()) { 		std::cout << x.first.first << std::endl;
-		// 		std::cout << x.first.second << std::endl;
-		// 		for (auto y : x.second) {
-		// 			std::cout << y << ' ';
-		// 		}
-		// 		std::cout << std::endl;
-		// 		std::cout << std::endl;
-		// 	}
-		// }
-
-		// for (auto x : DFA_transitions) {
-		// 	int a = x.first.first;
-		// 	int b = x.second;
-		// 	std::string s = x.first.second;
-		// 	std::cout << a << ' ' << s << ' ' << b << std::endl;
-		// }
-
-		// for (auto z : saver_left) {
-		// 	std::cout << z.first << std::endl;
-		// 	auto x = z.second;
-		// 	for (auto y : x) {
-		// 		auto [l, r, c] = y;
-		// 		std::cout << l << ": ";
-		// 		for (auto y : r) {
-		// 			std::cout << y;
-		// 		}
-		// 		std::cout << "  kont:";
-		// 		for (auto y : c) {
-		// 			std::cout << y;
-		// 		}
-		// 		std::cout << std::endl;
-		// 	}
-		// 	std::cout << std::endl;
-		// }
-		// for (auto x : new_state) {
-		// 	std::cout << x.first.first << ' ' << x.first.second << ' '
-		// 			  << x.second << std::endl;
-		// }
-		// print_transitions();
-		// std::string left = "<A>";
-		// std::vector<std::string> right = {"<B>", ".", "<A>"};
-		// std::set<std::string> context = {"!END!"};
-		// epsi_closure(std::make_tuple(left, right, context));
 	}
 
 	std::map<std::pair<int, std::string>, std::vector<std::string>>
@@ -555,20 +504,22 @@ class ENFA {
 	}
 };
 int main(void) {
+	int red_cnt = 0;
 	std::string line;
 	std::unordered_set<std::string> terminals;
 	std::unordered_set<std::string> non_terminals;
 	std::unordered_set<std::string> sync;
 	std::multimap<std::string, std::vector<std::string>> productions;
-	std::vector<std::pair<std::string, std::vector<std::string>>> reductions;
+	std::map<std::vector<std::string>, int> reductions;
 	std::string current_sign;
 	std::string starting_production;
+	std::vector<std::string> temp;
 	while (std::getline(std::cin, line)) {
-		// Parse non-terminal symbols
+
 		if (line.substr(0, 2) == "%V") {
 			line = line.substr(line.find(' ') + 1);
 			starting_production = line.substr(0, line.find(' '));
-			// std::cout << starting_production << std::endl;
+
 			while (!line.empty()) {
 				if (line.find(' ') == std::string::npos) {
 					non_terminals.insert(line);
@@ -580,7 +531,6 @@ int main(void) {
 			}
 		}
 
-		// Parse terminal symbols
 		else if (line.substr(0, 2) == "%T") {
 			line = line.substr(line.find(' ') + 1);
 
@@ -597,7 +547,7 @@ int main(void) {
 				}
 			}
 		}
-		// Parse syncing symbols
+
 		else if (line.substr(0, 4) == "%Syn") {
 			line = line.substr(line.find(' ') + 1);
 			for (int i = 0; i < line.size(); ++i) {
@@ -613,9 +563,10 @@ int main(void) {
 				}
 			}
 		}
-		// Parse productions
+
 		else if (line.at(0) != ' ') {
 			current_sign = line;
+			temp = {line};
 		} else {
 			line = line.substr(1);
 			std::vector<std::string> right_production;
@@ -628,46 +579,25 @@ int main(void) {
 					line = line.substr(line.find(' ') + 1);
 				}
 			}
-			reductions.push_back(
-				std::make_pair(current_sign, right_production));
-			productions.emplace(current_sign, right_production);
+			if (right_production.size() == 1 && right_production.at(0) == "$") {
+				reductions[temp] = red_cnt++;
+				productions.emplace(current_sign, right_production);
+			} else {
+				for (auto y : right_production) {
+					temp.push_back(y);
+				}
+				reductions[temp] = red_cnt++;
+				productions.emplace(current_sign, right_production);
+			}
 		}
 	}
-	// for (auto x : non_terminals) {
-	// 	std::cout << x << ' ';
-	// }
-	// std::cout << std::endl;
-	// for (auto x : terminals) {
-	// 	std::cout << x << ' ';
-	// }
-	// std::cout << std::endl;
-	// for (auto x : sync) {
-	// 	std::cout << x << ' ';
-	// }
-	// std::cout << std::endl;
-	// for (auto x : productions) {
-	// 	std::cout << x.first << " -> ";
-	// 	for (auto y : x.second) {
-	// 		std::cout << y << ' ';
-	// 	}
-	// 	std::cout << std::endl;
-	// }
-
-	ENFA enka(productions, starting_production, non_terminals, terminals, sync);
+	ENFA enka(productions, starting_production, non_terminals, terminals, sync,
+			  reductions);
 	std::map<std::pair<int, std::string>, std::vector<std::string>> action =
 		enka.get_action();
 	std::map<std::pair<int, std::string>, int> new_state = enka.get_new_state();
 	std::ofstream file("./analizator/table.txt");
 	if (file.is_open()) {
-		file << "REDUCTION ORDER\n";
-		int i = 0;
-		for (auto x : reductions) {
-			file << i++ << ' ' << x.first << "-";
-			for (auto y : x.second) {
-				file << y << ' ';
-			}
-			file << std::endl;
-		}
 		file << "ACTION TABLE\n";
 		for (auto x : action) {
 			file << ' ' << x.first.first << ' ' << x.first.second << std::endl;
