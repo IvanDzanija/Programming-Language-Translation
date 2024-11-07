@@ -1,4 +1,4 @@
-#include <chrono>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <queue>
@@ -45,13 +45,15 @@ class ENFA {
 	// hash set of empty non terminal symbols
 	std::unordered_set<std::string> empty_symbols;
 	// hash map of immediate starts of non terminal symbols
-	std::unordered_map<std::string, std::vector<std::string>> immediate_starts;
+	std::unordered_map<std::string, std::unordered_set<std::string>>
+		immediate_starts;
 	// hash map of all posible starts of non terminal symbols
-	std::unordered_map<std::string, std::vector<std::string>> symbol_starts;
+	std::unordered_map<std::string, std::unordered_set<std::string>>
+		symbol_starts;
 	// hash map of all poss starts relations
-	std::unordered_map<std::string, std::vector<std::string>>
+	std::unordered_map<std::string, std::unordered_set<std::string>>
 		non_terminal_starts;
-	std::map<std::vector<std::string>, std::set<std::string>> starts;
+	std::map<std::vector<std::string>, std::unordered_set<std::string>> starts;
 
 	std::set<std::set<tpl>> DFA_states;
 	std::unordered_map<int, std::set<tpl>> saver_left;
@@ -62,10 +64,6 @@ class ENFA {
 
 	std::map<std::pair<int, std::string>, std::vector<std::string>> action;
 	std::map<std::pair<int, std::string>, int> new_state;
-
-	bool is_starter(std::vector<std::string> to_check) {
-		return to_check.at(0) == ".";
-	}
 
 	void find_empty_symbols() {
 		std::queue<std::string> q;
@@ -103,11 +101,11 @@ class ENFA {
 			if (right.size() == 1 && right.at(0) == "$") {
 				continue;
 			}
-			this->immediate_starts[left].push_back(right.at(0));
+			this->immediate_starts[left].insert(right.at(0));
 			for (int i = 0;
 				 i < right.size() - 1 && empty_symbols.count(right.at(i));
 				 ++i) {
-				this->immediate_starts[left].push_back(right.at(i + 1));
+				this->immediate_starts[left].insert(right.at(i + 1));
 			}
 		}
 	}
@@ -116,18 +114,18 @@ class ENFA {
 		find_immediate_starts();
 		for (auto table : this->immediate_starts) {
 			std::string left = table.first;
-			this->symbol_starts[left].push_back(left);
-			std::vector<std::string> right = table.second;
-			for (int i = 0; i < right.size(); ++i) {
-				std::string current_right = right.at(i);
-				this->symbol_starts[left].push_back(current_right);
+			this->symbol_starts[left].insert(left);
+			std::unordered_set<std::string> right = table.second;
+			for (auto i : right) {
+				std::string current_right = i;
+				this->symbol_starts[left].insert(current_right);
 				if (this->immediate_starts.count(current_right)) {
-					std::vector<std::string> additions =
+					std::unordered_set<std::string> additions =
 						this->immediate_starts[current_right];
 					std::queue<std::string> q;
 					std::set<std::string> visited;
-					for (int j = 0; j < additions.size(); ++j) {
-						q.push(additions.at(j));
+					for (auto j : additions) {
+						q.push((j));
 					}
 					while (!q.empty()) {
 						std::string current = q.front();
@@ -136,11 +134,13 @@ class ENFA {
 							continue;
 						}
 						visited.insert(current);
-						this->symbol_starts[left].push_back(current);
-						std::vector<std::string> news =
-							this->immediate_starts[current];
-						for (auto x : news) {
-							q.push(x);
+						this->symbol_starts[left].insert(current);
+						if (this->immediate_starts.count(current)) {
+							std::unordered_set<std::string> news =
+								this->immediate_starts[current];
+							for (auto x : news) {
+								q.push(x);
+							}
 						}
 					}
 				}
@@ -153,7 +153,7 @@ class ENFA {
 		for (auto current : this->symbol_starts) {
 			for (auto pos : current.second) {
 				if (terminals.count(pos)) {
-					this->non_terminal_starts[current.first].push_back(pos);
+					this->non_terminal_starts[current.first].insert(pos);
 				}
 			}
 		}
@@ -217,10 +217,10 @@ class ENFA {
 	void get_transitions() {
 		std::string left = "START";
 		std::vector<std::string> right = {".", starting_production};
-		std::set<std::string> context = {"END"};
+		std::set<std::string> context = {"!END!"};
 		std::queue<tpl> q;
 		q.push(std::make_tuple(left, right, context));
-
+		std::set<tpl> visited;
 		while (!q.empty()) {
 			tpl front = q.front();
 			auto [l, r, c] = front;
@@ -252,21 +252,14 @@ class ENFA {
 				if (i + 2 == r.size()) {
 					next_context = c;
 				} else {
-					bool checking = false;
+					// bool checking = false;
 					bool poss = true;
-					bool helper = false;
-					for (auto it = r.begin(); it != r.end() && poss;
+					// bool helper = false;
+					for (auto it = r.begin() + 2; it != r.end();
 						 it = std::next(it)) {
-						if (checking) {
-							if (!empty_symbols.count(*it)) {
-								poss = false;
-							}
-						}
-						if (helper) {
-							checking = true;
-						}
-						if (*it == ".") {
-							helper = true;
+
+						if (!empty_symbols.count(*it)) {
+							poss = false;
 						}
 					}
 					if (poss) {
@@ -360,7 +353,7 @@ class ENFA {
 		int counter = 0;
 		std::string left = "START";
 		std::vector<std::string> right = {".", starting_production};
-		std::set<std::string> context = {"END"};
+		std::set<std::string> context = {"!END!"};
 		std::queue<std::set<tpl>> q;
 		q.push(epsi_closure(std::make_tuple(left, right, context)));
 		while (!q.empty()) {
@@ -379,7 +372,6 @@ class ENFA {
 
 			DFA_states.insert(top);
 			for (auto sign : terminals) {
-				// std::cout << sign << std::endl;
 				std::set<tpl> transitions_states;
 				for (auto state : top) {
 					auto range =
@@ -448,15 +440,22 @@ class ENFA {
 			std::set<tpl> state = x.second;
 			for (auto [l, r, c] : state) {
 				if (r.at(r.size() - 1) == ".") {
-					if (l == "START" && c.size() == 1 && *c.begin() == "END") {
-						action[std::make_pair(first_num, "END")] = {};
+					if (l == "START" && c.size() == 1 &&
+						*c.begin() == "!END!") {
+						action[std::make_pair(first_num, "!END!")] = {"ACCEPT"};
 					} else {
-						for (auto terminal : terminals) {
-							action[std::make_pair(first_num, terminal)]
-								.push_back(l);
-							for (auto sign : c) {
+						std::unordered_set<std::string> current_terms =
+							terminals;
+						current_terms.insert("!END!");
+						for (auto terminal : current_terms) {
+							if (c.count(terminal)) {
 								action[std::make_pair(first_num, terminal)]
-									.push_back(sign);
+									.push_back(l);
+								for (int i = 0; i < r.size() - 1; ++i) {
+									std::string sign = r.at(i);
+									action[std::make_pair(first_num, terminal)]
+										.push_back(sign);
+								}
 							}
 						}
 					}
@@ -482,91 +481,6 @@ class ENFA {
 			}
 		}
 	}
-	void print_empty_symbols() {
-		for (auto symbol : this->empty_symbols) {
-			std::cout << symbol << std::endl;
-		}
-	}
-
-	void print_immediate_starts() {
-		for (auto table : this->immediate_starts) {
-			std::cout << table.first << ": ";
-			for (auto symb : table.second) {
-				std::cout << symb << ' ';
-			}
-
-			std::cout << std::endl;
-		}
-	}
-
-	void print_symbol_starts() {
-		for (auto table : this->symbol_starts) {
-			std::cout << table.first << ": ";
-			for (auto symb : table.second) {
-				std::cout << symb << ' ';
-			}
-
-			std::cout << std::endl;
-		}
-	}
-
-	void print_starts() {
-		for (auto x : starts) {
-			for (auto y : x.first) {
-				std::cout << y << ' ';
-			}
-			std::cout << ": ";
-			for (auto y : x.second) {
-				std::cout << y << ' ';
-			}
-			std::cout << std::endl;
-		}
-	}
-
-	void print_states() {
-		for (auto x : states) {
-			auto [l, r, c] = x;
-			std::cout << l << ": ";
-			for (auto y : r) {
-				std::cout << y;
-			}
-			std::cout << "  kont:";
-			for (auto y : c) {
-				std::cout << y;
-			}
-			std::cout << std::endl;
-		}
-	}
-	void print_transitions() {
-		std::cout << transitions.size() << std::endl;
-		for (auto x : transitions) {
-			auto s = x.first.second;
-			auto [d, e, f] = x.second;
-			auto [a, b, c] = x.first.first;
-
-			std::cout << a << ":";
-			for (auto y : b) {
-				std::cout << y;
-			}
-			std::cout << "{";
-			for (auto y : c) {
-				std::cout << y;
-			}
-			std::cout << "}";
-			std::cout << " ->" + s + ": ";
-			std::cout << d << ":";
-			for (auto y : e) {
-				std::cout << y;
-			}
-			std::cout << "{";
-			for (auto y : f) {
-				std::cout << y;
-			}
-			std::cout << "}";
-			std::cout << std::endl;
-			std::cout << std::endl;
-		}
-	}
 
   public:
 	ENFA(std::multimap<std::string, std::vector<std::string>> productions,
@@ -579,11 +493,23 @@ class ENFA {
 		this->sync = sync;
 		this->productions = productions;
 		this->starting_production = starting_production;
-
 		get_items();
 		get_transitions();
 		create_DFA();
 		build_tables();
+		std::cout << states.size() << std::endl;
+		std::cout << DFA_states.size() << ' ' << saver_left.size() << std::endl;
+		std::cout << transitions.size() << std::endl;
+		// DFA_transitions.size() << std::endl; for (auto x : action) { 	if
+		// (!x.second.empty()) { 		std::cout << x.first.first << std::endl;
+		// 		std::cout << x.first.second << std::endl;
+		// 		for (auto y : x.second) {
+		// 			std::cout << y << ' ';
+		// 		}
+		// 		std::cout << std::endl;
+		// 		std::cout << std::endl;
+		// 	}
+		// }
 
 		// for (auto x : DFA_transitions) {
 		// 	int a = x.first.first;
@@ -591,11 +517,10 @@ class ENFA {
 		// 	std::string s = x.first.second;
 		// 	std::cout << a << ' ' << s << ' ' << b << std::endl;
 		// }
-		for (auto x : new_state) {
-			std::cout << x.first.first << ' ' << x.first.second << ' '
-					  << x.second << std::endl;
-		}
-		// for (auto x : DFA_states) {
+
+		// for (auto z : saver_left) {
+		// 	std::cout << z.first << std::endl;
+		// 	auto x = z.second;
 		// 	for (auto y : x) {
 		// 		auto [l, r, c] = y;
 		// 		std::cout << l << ": ";
@@ -610,11 +535,23 @@ class ENFA {
 		// 	}
 		// 	std::cout << std::endl;
 		// }
+		// for (auto x : new_state) {
+		// 	std::cout << x.first.first << ' ' << x.first.second << ' '
+		// 			  << x.second << std::endl;
+		// }
 		// print_transitions();
 		// std::string left = "<A>";
 		// std::vector<std::string> right = {"<B>", ".", "<A>"};
-		// std::set<std::string> context = {"END"};
+		// std::set<std::string> context = {"!END!"};
 		// epsi_closure(std::make_tuple(left, right, context));
+	}
+
+	std::map<std::pair<int, std::string>, std::vector<std::string>>
+	get_action() {
+		return this->action;
+	}
+	std::map<std::pair<int, std::string>, int> get_new_state() {
+		return this->new_state;
 	}
 };
 int main(void) {
@@ -623,6 +560,7 @@ int main(void) {
 	std::unordered_set<std::string> non_terminals;
 	std::unordered_set<std::string> sync;
 	std::multimap<std::string, std::vector<std::string>> productions;
+	std::vector<std::pair<std::string, std::vector<std::string>>> reductions;
 	std::string current_sign;
 	std::string starting_production;
 	while (std::getline(std::cin, line)) {
@@ -690,6 +628,8 @@ int main(void) {
 					line = line.substr(line.find(' ') + 1);
 				}
 			}
+			reductions.push_back(
+				std::make_pair(current_sign, right_production));
 			productions.emplace(current_sign, right_production);
 		}
 	}
@@ -714,6 +654,43 @@ int main(void) {
 	// }
 
 	ENFA enka(productions, starting_production, non_terminals, terminals, sync);
+	std::map<std::pair<int, std::string>, std::vector<std::string>> action =
+		enka.get_action();
+	std::map<std::pair<int, std::string>, int> new_state = enka.get_new_state();
+	std::ofstream file("./analizator/table.txt");
+	if (file.is_open()) {
+		file << "REDUCTION ORDER\n";
+		int i = 0;
+		for (auto x : reductions) {
+			file << i++ << ' ' << x.first << "-";
+			for (auto y : x.second) {
+				file << y << ' ';
+			}
+			file << std::endl;
+		}
+		file << "ACTION TABLE\n";
+		for (auto x : action) {
+			file << ' ' << x.first.first << ' ' << x.first.second << std::endl;
+			for (auto y : x.second) {
+				file << y << ' ';
+			}
+			file << std::endl;
+		}
+		file << "NEW STATE TABLE\n";
+		for (auto x : new_state) {
+			file << x.first.first << ' ' << x.first.second << ' ' << x.second
+				 << std::endl;
+		}
+		file << "SYNC SYMBOLS\n";
+		for (auto x : sync) {
+			file << x << ' ';
+		}
+		file << std::endl;
+
+	} else {
+		std::cerr << "Unable to open file.\n";
+	}
+	file.close();
 
 	return 0;
 }
