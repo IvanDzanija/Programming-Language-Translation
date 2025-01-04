@@ -118,9 +118,14 @@ void aditivni_izraz(node *root);
 void odnosni_izraz(node *root);
 void jednakosni_izraz(node *root);
 void bin_i_izraz(node *root);
-void izraz(node *root);
-void prijevodna_jedinica(node *root);
+void bin_xili_izraz(node *root);
+void bin_ili_izraz(node *root);
+void log_i_izraz(node *root);
+void log_ili_izraz(node *root);
 void izraz_pridruzivanja(node *root);
+void izraz(node *root);
+
+void prijevodna_jedinica(node *root);
 
 void primarni_izraz(node *root) {
 	std::string symbol = root->children.at(0).symbol;
@@ -665,7 +670,189 @@ void bin_xili_izraz(node *root) {
 	return;
 }
 
-void izraz(node *root) {}
+void bin_ili_izraz(node *root) {
+	// <bin_ili_izraz> ::= <bin_xili_izraz>
+	// tip ← <bin_xili_izraz>.tip
+	// l-izraz ← <bin_xili_izraz>.l-izraz
+	if (root->children.size() == 1 &&
+		root->children.at(0).symbol == "<bin_xili_izraz>") {
+		// 1. provjeri(<bin_xili_izraz>)
+		bin_xili_izraz(&root->children.at(0));
+		root->type = root->children.at(0).type;
+		root->lhs = root->children.at(0).lhs;
+	}
+	// <bin_ili_izraz> ::= <bin_ili_izraz> OP_BIN_ILI <bin_xili_izraz>
+	// tip ← int
+	// l-izraz ← 0
+	else if (root->children.size() == 3 &&
+			 root->children.at(1).symbol == "OP_BIN_ILI") {
+		// 1. provjeri(<bin_ili_izraz>)
+		// 2. <bin_ili_izraz >.tip ∼ int
+		// 3. provjeri(<bin_xili_izraz>)
+		// 4. <bin_xili_izraz >.tip ∼ int
+		bin_ili_izraz(&root->children.at(0));
+		if (!implicit_conversion(root->children.at(0).type, "int")) {
+			semantic_error(root);
+		} else {
+			bin_xili_izraz(&root->children.at(2));
+			if (!implicit_conversion(root->children.at(2).type, "int")) {
+				semantic_error(root);
+			} else {
+				root->type = "int";
+				root->lhs = false;
+			}
+		}
+	} else {
+		semantic_error(root);
+	}
+	return;
+}
+
+void log_i_izraz(node *root) {
+	// <log_i_izraz> ::= <bin_ili_izraz>
+	// tip ← <bin_ili_izraz>.tip
+	// l-izraz ← <bin_ili_izraz>.l-izraz
+	if (root->children.size() == 1 &&
+		root->children.at(0).symbol == "<bin_ili_izraz>") {
+		// 1. provjeri(<bin_ili_izraz>)
+		bin_ili_izraz(&root->children.at(0));
+		root->type = root->children.at(0).type;
+		root->lhs = root->children.at(0).lhs;
+	}
+	// <log_i_izraz> ::= <log_i_izraz> OP_I <bin_ili_izraz>
+	// tip ← int
+	// l-izraz ← 0
+	else if (root->children.size() == 3 &&
+			 root->children.at(1).symbol == "OP_I") {
+		// 1. provjeri(<log_i_izraz>)
+		// 2. <log_i_izraz>.tip ∼ int
+		// 3. provjeri(<bin_ili_izraz>)
+		// 4. <bin_ili_izraz>.tip ∼ int
+		log_i_izraz(&root->children.at(0));
+		if (!implicit_conversion(root->children.at(0).type, "int")) {
+			semantic_error(root);
+		} else {
+			bin_ili_izraz(&root->children.at(2));
+			if (!implicit_conversion(root->children.at(2).type, "int")) {
+				semantic_error(root);
+			} else {
+				root->type = "int";
+				root->lhs = false;
+			}
+		}
+	} else {
+		semantic_error(root);
+	}
+	return;
+}
+
+void log_ili_izraz(node *root) {
+	// <log_ili_izraz> ::= <log_i_izraz>
+	// tip ← <log_i_izraz>.tip
+	// l-izraz ← <log_i_izraz>.l-izraz
+	if (root->children.size() == 1 &&
+		root->children.at(0).symbol == "<log_i_izraz>") {
+		// 1. provjeri(<log_i_izraz>)
+		log_i_izraz(&root->children.at(0));
+		root->type = root->children.at(0).type;
+		root->lhs = root->children.at(0).lhs;
+	}
+	// <log_ili_izraz> ::= <log_ili_izraz> OP_ILI <log_i_izraz>
+	// tip ← int
+	// l-izraz ← 0
+	else if (root->children.size() == 3 &&
+			 root->children.at(1).symbol == "OP_ILI") {
+		// 1. provjeri(<log_ili_izraz>)
+		// 2. <log_ili_izraz>.tip ∼ int
+		// 3. provjeri(<log_i_izraz>)
+		// 4. <log_i_izraz>.tip ∼ int
+		log_ili_izraz(&root->children.at(0));
+		if (!implicit_conversion(root->children.at(0).type, "int")) {
+			semantic_error(root);
+		} else {
+			log_i_izraz(&root->children.at(2));
+			if (!implicit_conversion(root->children.at(2).type, "int")) {
+				semantic_error(root);
+			} else {
+				root->type = "int";
+				root->lhs = false;
+			}
+		}
+	} else {
+		semantic_error(root);
+	}
+	return;
+}
+
+void izraz_pridruzivanja(node *root) {
+	// <izraz_pridruzivanja> ::= <log_ili_izraz>
+	// tip ← <log_ili_izraz>.tip
+	// l-izraz ← <log_ili_izraz>.l-izraz
+	if (root->children.size() == 1 &&
+		root->children.at(0).symbol == "<log_ili_izraz>") {
+		// 1. provjeri(<log_ili_izraz>)
+		log_ili_izraz(&root->children.at(0));
+		root->type = root->children.at(0).type;
+		root->lhs = root->children.at(0).lhs;
+	}
+	// <izraz_pridruzivanja> ::= <postfiks_izraz> OP_PRIDRUZI
+	// <izraz_pridruzivanja>
+	// tip ← <postfiks_izraz>.tip
+	// l-izraz ← 0
+	else if (root->children.size() == 3 &&
+			 root->children.at(1).symbol == "OP_PRIDRUZI") {
+		// 1. provjeri(<postfiks_izraz>)
+		// 2. <postfiks_izraz>.l-izraz = 1
+		// 3. provjeri(<izraz_pridruzivanja>)
+		// 4. <izraz_pridruzivanja>.tip ∼ <postfiks_izraz>.tip
+		postfiks_izraz(&root->children.at(0));
+		if (!root->children.at(0).lhs) {
+			semantic_error(root);
+		} else {
+			izraz_pridruzivanja(&root->children.at(2));
+			if (!implicit_conversion(root->children.at(2).type,
+									 root->children.at(0).type)) {
+				semantic_error(root);
+			} else {
+				root->type = root->children.at(0).type;
+				root->lhs = false;
+			}
+		}
+	} else {
+		semantic_error(root);
+	}
+	return;
+}
+
+void izraz(node *root) {
+	// <izraz> ::= <izraz_pridruzivanja>
+	// tip ← <izraz_pridruzivanja>.tip
+	// l-izraz ← <izraz_pridruzivanja>.l-izraz
+	if (root->children.size() == 1 &&
+		root->children.at(0).symbol == "<izraz_pridruzivanja>") {
+		// 1. provjeri(<izraz_pridruzivanja>)
+		izraz_pridruzivanja(&root->children.at(0));
+		root->type = root->children.at(0).type;
+		root->lhs = root->children.at(0).lhs;
+	}
+	// <izraz> ::= <izraz> ZAREZ <izraz_pridruzivanja>
+	// tip ← <izraz_pridruzivanja>.tip
+	// l-izraz ← 0
+	else if (root->children.size() == 3 &&
+			 root->children.at(0).symbol == "<izraz>" &&
+			 root->children.at(1).symbol == "ZAREZ" &&
+			 root->children.at(2).symbol == "<izraz_pridruzivanja>") {
+		// 1. provjeri(<izraz>)
+		// 2. provjeri(<izraz_pridruzivanja>)
+		izraz(&root->children.at(0));
+		izraz_pridruzivanja(&root->children.at(2));
+		root->type = root->children.at(2).type;
+		root->lhs = false;
+	} else {
+		semantic_error(root);
+	}
+	return;
+}
 void prijevodna_jedinica(node *root) {}
 
 int main(void) {
