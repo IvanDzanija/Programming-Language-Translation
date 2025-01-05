@@ -7,13 +7,14 @@
 // prebaciti funckije produckije u poseban file
 // stvoriti klasu node
 // maknuti exit(0) -> staviti svaku funkciju return int i vratiti 0
+// staviti potpune if i else uvjete
 
 // helper structures;
 struct node {
-	std::string type = "undefined";
+	std::string type = "undefined", inherited_type = "undefined", name;
 	bool lhs = false;
-	int row, depth;
-	std::vector<std::string> arg_types;
+	int row, depth, element_count;
+	std::vector<std::string> arg_types, arg_names;
 	std::string symbol, value;
 	std::vector<node> children;
 };
@@ -36,7 +37,7 @@ void print_node(node node) {
 	}
 }
 
-void semantic_error(node *root) {
+int semantic_error(node *root) {
 	std::cout << root->symbol << " ::=";
 	for (node current : root->children) {
 		std::cout << ' ' << current.symbol;
@@ -45,7 +46,8 @@ void semantic_error(node *root) {
 		}
 	}
 	std::cout << std::endl;
-	exit(0);
+	exit(1);
+	return 1;
 }
 
 bool accepted_char(std::string to_check) {
@@ -119,6 +121,21 @@ bool same_arguments(std::vector<std::string> args1,
 	}
 	return true;
 }
+std::string remove_const(std::string type) {
+	if (is_const(type)) {
+		return type.substr(6, type.size() - 1 - 6);
+	} else {
+		return type;
+	}
+}
+
+std::string remove_array(std::string type) {
+	if (is_array(type)) {
+		return type.substr(4, type.size() - 1 - 4);
+	} else {
+		return type;
+	}
+}
 
 // production functions
 void primarni_izraz(node *root);
@@ -147,14 +164,24 @@ void naredba_grananja(node *root);
 void naredba_petlje(node *root);
 void naredba_skoka(node *root);
 void prijevodna_jedinica(node *root);
-void vanjska_deklaracija(node *root);
-void definicija_funkcije(node *root);
+int vanjska_deklaracija(node *root);
+int definicija_funkcije(node *root);
+int lista_parametara(node *root);
+int deklaracija_parametra(node *root);
+int lista_deklaracija(node *root);
+int deklaracija(node *root);
+int lista_init_deklaratora(node *root);
+int init_deklarator(node *root);
+int izravni_deklarator(node *root);
+int inicijalizator(node *root);
+int lista_izraza_pridruzivanja(node *root);
 
 void primarni_izraz(node *root) {
 	std::string symbol = root->children.at(0).symbol;
 	std::string value = root->children.at(0).value;
 	if (root->children.at(0).symbol == "IDN") {
 		// implement
+		semantic_error(root);
 		return;
 	} else if (symbol == "BROJ") {
 		root->type = "int";
@@ -1115,27 +1142,33 @@ void prijevodna_jedinica(node *root) {
 	return;
 }
 
-void vanjska_deklaracija(node *root) {
+int vanjska_deklaracija(node *root) {
 	// Nezavrsni znak <vanjska_deklaracija> generira ili definiciju funkcije
 	// (znak <definicija_funkcije>) ili deklaraciju varijable ili funkcije (znak
 	// <deklaracija>). Obje produkcije su jedinicne
 	// i u obje se provjeravaju pravila u podstablu kojem je znak s desne strane
 	// korijen.
+	std::cout << root->children.size() << std::endl;
 	if (root->children.size() == 1) {
 		if (root->children.at(0).symbol == "<definicija_funkcije>") {
-			definicija_funkcije(&root->children.at(0));
+			if (definicija_funkcije(&root->children.at(0))) {
+				return 1;
+			}
 		} else if (root->children.at(0).symbol == "<deklaracija>") {
-			deklaracija(&root->children.at(0));
+			if (deklaracija(&root->children.at(0))) {
+				return 1;
+			}
 		} else {
-			semantic_error(root);
+			return semantic_error(root);
 		}
 	} else {
-		semantic_error(root);
+		std::cout << "tu" << std::endl;
+		return semantic_error(root);
 	}
-	return;
+	return 0;
 }
 
-void definicija_funckije(node *root) {
+int definicija_funkcije(node *root) {
 	// <definicija_funkcije> ::= <ime_tipa> IDN L_ZAGRADA KR_VOID D_ZAGRADA
 	// <slozena_naredba>
 	if (root->children.size() == 4) {
@@ -1148,7 +1181,7 @@ void definicija_funckije(node *root) {
 		// 6. provjeri(<slozena_naredba>)
 		ime_tipa(&root->children.at(0));
 		if (is_const(root->children.at(0).type)) {
-			semantic_error(root);
+			return (semantic_error(root));
 		} else {
 			if (defined_functions.count(root->children.at(1).value)) {
 				semantic_error(root);
@@ -1188,13 +1221,14 @@ void definicija_funckije(node *root) {
 		// je pripadni tip te deklaracije funkcija(<lista_parametara>.tipovi →
 		// <ime_tipa>.tip)
 		// 6. zabiljezi definiciju i deklaraciju funkcije
-		// 7. provjeri(<slozena_naredba>)uzparametrefunkcijekoriste
+		// 7. provjeri(<slozena_naredba>) uz parametre funkcije koristeci
+		// <lista_parametara>.tipovi i <lista_parametara>.imena.
 		ime_tipa(&root->children.at(0));
 		if (is_const(root->children.at(0).type)) {
-			semantic_error(root);
+			return semantic_error(root);
 		} else {
 			if (defined_functions.count(root->children.at(1).value)) {
-				semantic_error(root);
+				return semantic_error(root);
 			} else {
 				lista_parametara(&root->children.at(3));
 				std::vector<std::string> arguments =
@@ -1204,7 +1238,7 @@ void definicija_funckije(node *root) {
 				if (declared_functions.count(root->children.at(1).value) &&
 					declared_functions.at(root->children.at(1).value) !=
 						function_key) {
-					semantic_error(root);
+					return (semantic_error(root));
 				} else {
 					defined_functions.insert(root->children.at(1).value);
 					declared_functions.insert(
@@ -1213,6 +1247,8 @@ void definicija_funckije(node *root) {
 					// currenly in function
 					current_function_return_type = root->children.at(0).type;
 					current_function_argument_types = arguments;
+
+					// zavrsiti 7.korak
 					slozena_naredba(&root->children.at(3));
 
 					// reset
@@ -1221,7 +1257,319 @@ void definicija_funckije(node *root) {
 				}
 			}
 		}
+	} else {
+		return semantic_error(root);
 	}
+	return 0;
+}
+
+int lista_parametara(node *root) {
+	// 	<lista_parametara> ::= <deklaracija_parametra>
+	// tipovi ← [<deklaracija_parametra>.tip ]
+	// imena ← [ <deklaracija_parametra>.ime ]
+	if (root->children.size() == 1) {
+		// 1. provjeri(<deklaracija_parametra>)
+		if (deklaracija_parametra(&root->children.at(0))) {
+			return 1;
+		} else {
+			root->arg_types = root->children.at(0).arg_types;
+			root->arg_names = root->children.at(0).arg_names;
+		}
+	}
+	// <lista_parametara> ::= <lista_parametara> ZAREZ <deklaracija_parametra>
+	// tipovi ← <lista_parametara>.tipovi + [ <deklaracija_parametra>.tip ]
+	// imena ← <lista_parametara>.imena + [ <deklaracija_parametra>.ime ]
+	else if (root->children.size() == 3) {
+		// 1. provjeri(<lista_parametara>)
+		// 2. provjeri(<deklaracija_parametra>)
+		// 3. <deklaracija_parametra>.ime ne postoji u <lista_parametara>.imena
+		if (lista_parametara(&root->children.at(0))) {
+			return 1;
+		} else {
+			if (deklaracija_parametra(&root->children.at(2))) {
+				return 1;
+			} else {
+				for (std::string current_name :
+					 root->children.at(0).arg_names) {
+					if (root->children.at(2).name == current_name) {
+						return semantic_error(root);
+					}
+				}
+				root->arg_types = root->children.at(0).arg_types;
+				root->arg_names = root->children.at(0).arg_names;
+				root->arg_types.push_back(root->children.at(2).type);
+				root->arg_names.push_back(root->children.at(2).name);
+			}
+		}
+	} else {
+		return semantic_error(root);
+	}
+	return 0;
+}
+
+int deklaracija_parametra(node *root) {
+	// <deklaracija_parametra> ::= <ime_tipa> IDN
+	// tip ← <ime_tipa>.tip
+	// ime ← IDN.ime
+	if (root->children.size() == 2) {
+		// 1. provjeri(<ime_tipa>)
+		// 2. <ime_tipa>.tip ̸= void
+		ime_tipa(&root->children.at(0));
+		if (0) {
+			return 1;
+		}
+		if (root->children.at(0).type == "void") {
+			return semantic_error(root);
+		} else {
+			root->type = root->children.at(0).type;
+			root->name = root->children.at(1).value;
+		}
+	}
+	// <deklaracija_parametra> ::= <ime_tipa> IDN L_UGL_ZAGRADA D_UGL_ZAGRADA
+	// tip ← niz(<ime_tipa>.tip)
+	// ime ← IDN.ime
+	else if (root->children.size() == 4) {
+		// 1. provjeri(<ime_tipa>)
+		// 2. <ime_tipa>.tip ̸= void
+		ime_tipa(&root->children.at(0));
+		if (0) {
+			return 1;
+		}
+		if (root->children.at(0).type == "void") {
+			return semantic_error(root);
+		} else {
+			std::string current_type = "niz(";
+			current_type += root->children.at(0).type;
+			current_type += ")";
+			root->type = current_type;
+			root->name = root->children.at(1).value;
+		}
+	} else {
+		return semantic_error(root);
+	}
+	return 0;
+}
+
+int lista_deklaracija(node *root) {
+	// <lista_deklaracija> ::= <deklaracija>
+	if (root->children.size() == 1 &&
+		root->children.at(0).symbol == "<deklaracija>") {
+		// 1. provjeri(<deklaracija>)
+		if (deklaracija(&root->children.at(0))) {
+			return 1;
+		}
+	}
+	// <lista_deklaracija> ::= <lista_deklaracija> <deklaracija>
+	else if (root->children.size() == 2 &&
+			 root->children.at(0).symbol == "<lista_deklaracija>" &&
+			 root->children.at(1).symbol == "<deklaracija>") {
+		// 1. provjeri(<lista_deklaracija>)
+		// 2. provjeri(<deklaracija>)
+		if (lista_deklaracija(&root->children.at(0))) {
+			return 1;
+		} else {
+			if (deklaracija(&root->children.at(1))) {
+				return 1;
+			}
+		}
+	} else {
+		return semantic_error(root);
+	}
+	return 0;
+}
+
+int deklaracija(node *root) {
+	// <deklaracija> ::= <ime_tipa> <lista_init_deklaratora> TOCKAZAREZ
+	if (root->children.size() == 3 &&
+		root->children.at(0).symbol == "<ime_tipa>" &&
+		root->children.at(1).symbol == "<lista_init_deklaratora>" &&
+		root->children.at(2).symbol == "TOCKAZAREZ") {
+		// 1. provjeri(<ime_tipa>)
+		// 2. provjeri(<lista_init_deklaratora>) uz nasljedno svojstvo
+		// <lista_init_deklaratora>.ntip ← <ime_tipa>.tip
+		ime_tipa(&root->children.at(0));
+		if (0) {
+			return 1;
+		} else {
+			root->children.at(1).inherited_type = root->children.at(0).type;
+			lista_init_deklaratora(&root->children.at(1));
+		}
+	} else {
+		return semantic_error(root);
+	}
+	return 0;
+}
+
+int lista_init_deklaratora(node *root) {
+	// <lista_init_deklaratora> ::= <init_deklarator>
+	if (root->children.size() == 1 &&
+		root->children.at(0).symbol == "<init_deklarator>") {
+		// 1. provjeri(<init_deklarator>) uz nasljedno svojstvo
+		// <init_deklarator>.ntip ← <lista_init_deklaratora>.ntip
+		root->children.at(0).inherited_type = root->inherited_type;
+		if (init_deklarator(&root->children.at(0))) {
+			return 1;
+		}
+	}
+	// <lista_init_deklaratora>1 ::= <lista_init_deklaratora>2 ZAREZ
+	// <init_deklarator>
+	else if (root->children.size() == 3 &&
+			 root->children.at(0).symbol == "<lista_init_deklaratora>" &&
+			 root->children.at(1).symbol == "ZAREZ" &&
+			 root->children.at(2).symbol == "<init_deklarator>") {
+		// 1. provjeri(<lista_init_deklaratora>2) uz nasljedno svojstvo
+		// <lista_init_deklaratora>2.ntip ← <lista_init_deklaratora>1.ntip
+		// 2. provjeri(<init_deklarator>) uz nasljedno svojstvo
+		// <init_deklarator>.ntip ← <lista_init_deklaratora>1.ntip
+		root->children.at(0).inherited_type = root->inherited_type;
+		if (lista_init_deklaratora(&root->children.at(0))) {
+			return 1;
+		} else {
+			root->children.at(2).inherited_type = root->inherited_type;
+			if (init_deklarator(&root->children.at(2))) {
+				return 1;
+			}
+		}
+	} else {
+		return semantic_error(root);
+	}
+	return 0;
+}
+
+int init_deklarator(node *root) {
+	// 	<init_deklarator> ::= <izravni_deklarator>
+	if (root->children.size() == 1 &&
+		root->children.at(0).symbol == "<izravni_deklarator>") {
+		// 1. provjeri(<izravni_deklarator>) uz nasljedno svojstvo
+		// <izravni_deklarator>.ntip ← <init_deklarator>.ntip
+		// 2. <izravni_deklarator>.tip ̸= const(T) i
+		// <izravni_deklarator>.tip ̸= niz(const(T))
+		root->children.at(0).inherited_type = root->inherited_type;
+		if (izravni_deklarator(&root->children.at(0))) {
+			return 1;
+		} else {
+			if (is_const(root->children.at(0).type) ||
+				is_const(root->children.at(0).type.substr(4))) {
+				return semantic_error(root);
+			}
+		}
+	}
+	// <init_deklarator> ::= <izravni_deklarator> OP_PRIDRUZI <inicijalizator>
+	else if (root->children.size() == 3 &&
+			 root->children.at(1).symbol == "OP_PRIDRUZI" &&
+			 root->children.at(0).symbol == "<izravni_deklarator>" &&
+			 root->children.at(2).symbol == "<inicijalizator>") {
+		// 1. provjeri(<izravni_deklarator>) uz nasljedno svojstvo
+		// <izravni_deklarator>.ntip ← <init_deklarator>.ntip
+		// 2. provjeri(<incijalizator>)
+		// 3. ako je <izravni_deklarator>.tip T ili const(T)
+		// <inicijalizator>.tip ∼ T inace ako je <izravni_deklarator>.tip
+		// niz(T) ili niz(const(T)) <inicijalizator>.br-elem ≤
+		// <izravni_deklarator>.br-elem za svaki U iz <inicijalizator>.tipovi
+		// vrijedi U ∼ T inace greska
+		root->children.at(0).inherited_type = root->inherited_type;
+		if (izravni_deklarator(&root->children.at(0))) {
+			return 1;
+		} else {
+			if (inicijalizator(&root->children.at(2))) {
+				return 1;
+			}
+			if (is_array(root->children.at(0).type)) {
+				if (!(root->children.at(2).element_count <=
+					  root->children.at(0).element_count)) {
+					return semantic_error(root);
+				} else {
+					std::string current_type =
+						remove_const(remove_array(root->children.at(0).type));
+					for (std::string type : root->children.at(2).arg_types) {
+						if (!implicit_conversion(type, current_type)) {
+							return semantic_error(root);
+						}
+					}
+				}
+			} else {
+				// const(T) -> T
+				std::string current_type =
+					remove_const(root->children.at(0).type);
+				if (!implicit_conversion(root->children.at(2).type,
+										 current_type)) {
+					return semantic_error(root);
+				}
+			}
+		}
+	} else {
+		return semantic_error(root);
+	}
+	return 0;
+}
+
+int izravni_deklarator(node *root) {
+	// 	<izravni_deklarator> ::= IDN
+	// tip ← ntip
+	if (root->children.size() == 1 && root->children.at(0).symbol == "IDN") {
+		// 1. ntip ̸= void
+		// 2. IDN.ime nije deklarirano u lokalnom djelokrugu
+		// 3. zabiljezi deklaraciju IDN.ime s odgovarajucim tipom
+		if (root->inherited_type == "void") {
+			return semantic_error(root);
+		} else {
+			root->type = root->inherited_type;
+		}
+	} else {
+		return semantic_error(root);
+	}
+	return 0;
+}
+
+int inicijalizator(node *root) {
+	if (0) {
+
+	} else {
+		return semantic_error(root);
+	}
+	return 0;
+}
+
+int lista_izraza_pridruzivanja(node *root) {
+	// 	<lista_izraza_pridruzivanja> ::= <izraz_pridruzivanja>
+	// tipovi ← [ <izraz_pridruzivanja>.tip ]
+	// br-elem ← 1
+	if (root->children.size() == 1 &&
+		root->children.at(0).symbol == "<izraz_pridruzivanja>") {
+		// 1. provjeri(<izraz_pridruzivanja>)
+		izraz_pridruzivanja(&root->children.at(0));
+		if (0) {
+			return 1;
+		}
+		root->arg_types.push_back(root->children.at(0).type);
+		root->element_count = 1;
+	}
+	// 	<lista_izraza_pridruzivanja> ::= <lista_izraza_pridruzivanja> ZAREZ
+	// <izraz_pridruzivanja>
+	// tipovi ← <lista_izraza_pridruzivanja>.tipovi +
+	// [<izraz_pridruzivanja>.tip]
+	// br-elem ← <lista_izraza_pridruzivanja>.br-elem + 1
+	else if (root->children.size() == 3 &&
+			 root->children.at(0).symbol == "<lista_izraza_pridruzivanja>" &&
+			 root->children.at(1).symbol == "ZAREZ" &&
+			 root->children.at(2).symbol == "<izraz_pridruzivanja>") {
+		// 1. provjeri(<lista_izraza_pridruzivanja>)
+		// 2. provjeri(<izraz_pridruzivanja>)
+		if (lista_izraza_pridruzivanja(&root->children.at(0))) {
+			return 1;
+		} else {
+			izraz_pridruzivanja(&root->children.at(2));
+			if (0) {
+				return 1;
+			}
+			root->arg_types = root->children.at(0).arg_types;
+			root->arg_types.push_back(root->children.at(2).type);
+			root->element_count = root->children.at(0).element_count + 1;
+		}
+	} else {
+		return semantic_error(root);
+	}
+	return 0;
 }
 
 int main(void) {
@@ -1257,9 +1605,17 @@ int main(void) {
 		all_nodes.at(iter).children.push_back(current_node);
 		all_nodes.push_back(current_node);
 	}
-	// primarni_izraz(&all_nodes.at(0));
 	// assuming there is something in the input if not it it correct ?
-	// prijevodna_jedinica(all_nodes.at(0));
+	for (auto x : all_nodes) {
+		std::cout << x.symbol << std::endl;
+		std::cout << ":>" << std::endl;
+		for (auto y : x.children) {
+			std::cout << y.symbol << " ";
+		}
+		std::cout << std::endl;
+		std::cout << "--------------------------" << std::endl;
+	}
+	prijevodna_jedinica(&all_nodes.at(0));
 
 	return 0;
 }
