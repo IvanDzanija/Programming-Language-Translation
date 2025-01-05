@@ -419,6 +419,7 @@ int lista_argumenata(node *root) {
 	return 0;
 }
 
+// FINISHED
 int unarni_izraz(node *root) {
 	// 	<unarni_izraz> ::= <postfiks_izraz>
 	// tip ← <postfiks_izraz>.tip
@@ -446,7 +447,7 @@ int unarni_izraz(node *root) {
 			return 1;
 		} else {
 			if (!root->children.at(1)->lhs) {
-				root->semantic_error();
+				return root->semantic_error();
 			} else if (!implicit_conversion(root->children.at(1)->type,
 											"int")) {
 				return root->semantic_error();
