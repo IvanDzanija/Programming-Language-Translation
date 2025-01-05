@@ -1,9 +1,12 @@
 #include <iostream>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 // prebaciti funckije produckije u poseban file
 // stvoriti klasu node
+// maknuti exit(0) -> staviti svaku funkciju return int i vratiti 0
 
 // helper structures;
 struct node {
@@ -19,6 +22,10 @@ std::vector<node> all_nodes;
 int loop_depth = 0; // tracks the depth of the loop
 std::vector<std::string> current_function_argument_types;
 std::string current_function_return_type = "";
+std::unordered_set<std::string> defined_functions;
+std::unordered_map<std::string,
+				   std::pair<std::string, std::vector<std::string>>>
+	declared_functions;
 
 // helper functions
 void print_node(node node) {
@@ -141,6 +148,7 @@ void naredba_petlje(node *root);
 void naredba_skoka(node *root);
 void prijevodna_jedinica(node *root);
 void vanjska_deklaracija(node *root);
+void definicija_funkcije(node *root);
 
 void primarni_izraz(node *root) {
 	std::string symbol = root->children.at(0).symbol;
@@ -1125,6 +1133,95 @@ void vanjska_deklaracija(node *root) {
 		semantic_error(root);
 	}
 	return;
+}
+
+void definicija_funckije(node *root) {
+	// <definicija_funkcije> ::= <ime_tipa> IDN L_ZAGRADA KR_VOID D_ZAGRADA
+	// <slozena_naredba>
+	if (root->children.size() == 4) {
+		// 1. provjeri(<ime_tipa>)
+		// 2. <ime_tipa>.tip ̸= const(T)
+		// 3. ne postoji prije definirana funkcija imena IDN.ime
+		// 4. ako postoji deklaracija imena IDN.ime u globalnom djelokrugu onda
+		// je pripadni tip te deklaracije funkcija(void → <ime_tipa>.tip)
+		// 5. zabiljezi definiciju i deklaraciju funkcije
+		// 6. provjeri(<slozena_naredba>)
+		ime_tipa(&root->children.at(0));
+		if (is_const(root->children.at(0).type)) {
+			semantic_error(root);
+		} else {
+			if (defined_functions.count(root->children.at(1).value)) {
+				semantic_error(root);
+			} else {
+				std::vector<std::string> arguments(1, "void");
+				std::pair<std::string, std::vector<std::string>> function_key =
+					make_pair(root->children.at(0).type, arguments);
+				if (declared_functions.count(root->children.at(1).value) &&
+					declared_functions.at(root->children.at(1).value) !=
+						function_key) {
+					semantic_error(root);
+				} else {
+					defined_functions.insert(root->children.at(1).value);
+					declared_functions.insert(
+						make_pair(root->children.at(1).value, function_key));
+
+					// currenly in function
+					current_function_return_type = root->children.at(0).type;
+					current_function_argument_types = arguments;
+					slozena_naredba(&root->children.at(3));
+
+					// reset
+					current_function_return_type.clear();
+					current_function_argument_types.clear();
+				}
+			}
+		}
+	}
+	// <definicija_funkcije> ::= <ime_tipa> IDN L_ZAGRADA <lista_parametara>
+	// D_ZAGRADA <slozena_naredba>
+	else if (root->children.size() == 6) {
+		// 1. provjeri(<ime_tipa>)
+		// 2. <ime_tipa>.tip ̸= const(T)
+		// 3. ne postoji prije definirana funkcija imena IDN.ime
+		// 4. provjeri(<lista_parametara>)
+		// 5. ako postoji deklaracija imena IDN.ime u globalnom djelokrugu onda
+		// je pripadni tip te deklaracije funkcija(<lista_parametara>.tipovi →
+		// <ime_tipa>.tip)
+		// 6. zabiljezi definiciju i deklaraciju funkcije
+		// 7. provjeri(<slozena_naredba>)uzparametrefunkcijekoriste
+		ime_tipa(&root->children.at(0));
+		if (is_const(root->children.at(0).type)) {
+			semantic_error(root);
+		} else {
+			if (defined_functions.count(root->children.at(1).value)) {
+				semantic_error(root);
+			} else {
+				lista_parametara(&root->children.at(3));
+				std::vector<std::string> arguments =
+					root->children.at(3).arg_types;
+				std::pair<std::string, std::vector<std::string>> function_key =
+					make_pair(root->children.at(0).type, arguments);
+				if (declared_functions.count(root->children.at(1).value) &&
+					declared_functions.at(root->children.at(1).value) !=
+						function_key) {
+					semantic_error(root);
+				} else {
+					defined_functions.insert(root->children.at(1).value);
+					declared_functions.insert(
+						make_pair(root->children.at(1).value, function_key));
+
+					// currenly in function
+					current_function_return_type = root->children.at(0).type;
+					current_function_argument_types = arguments;
+					slozena_naredba(&root->children.at(3));
+
+					// reset
+					current_function_return_type.clear();
+					current_function_argument_types.clear();
+				}
+			}
+		}
+	}
 }
 
 int main(void) {
