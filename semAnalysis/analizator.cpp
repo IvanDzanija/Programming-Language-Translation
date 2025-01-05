@@ -14,7 +14,11 @@ struct node {
 	std::string symbol, value;
 	std::vector<node> children;
 };
+
 std::vector<node> all_nodes;
+int loop_depth = 0; // tracks the depth of the loop
+std::vector<std::string> current_function_argument_types;
+std::string current_function_return_type = "";
 
 // helper functions
 void print_node(node node) {
@@ -74,6 +78,7 @@ bool implicit_conversion(std::string t1, std::string t2) {
 		return false;
 	}
 }
+
 bool explicit_conversion(std::string t1, std::string t2) {
 	if (t1 == t2) {
 		return true;
@@ -89,8 +94,11 @@ bool explicit_conversion(std::string t1, std::string t2) {
 		return false;
 	}
 }
+
 bool is_array(std::string type) { return type.substr(0, 3) == "niz"; }
+
 bool is_const(std::string type) { return type.substr(0, 5) == "const"; }
+
 bool same_arguments(std::vector<std::string> args1,
 					std::vector<std::string> args2) {
 	if (args1.size() != args2.size()) {
@@ -124,8 +132,15 @@ void log_i_izraz(node *root);
 void log_ili_izraz(node *root);
 void izraz_pridruzivanja(node *root);
 void izraz(node *root);
-
+void slozena_naredba(node *root);
+void lista_naredbi(node *root);
+void naredba(node *root);
+void izraz_naredba(node *root);
+void naredba_grananja(node *root);
+void naredba_petlje(node *root);
+void naredba_skoka(node *root);
 void prijevodna_jedinica(node *root);
+void vanjska_deklaracija(node *root);
 
 void primarni_izraz(node *root) {
 	std::string symbol = root->children.at(0).symbol;
@@ -473,6 +488,7 @@ void multiplikativni_izraz(node *root) {
 	}
 	return;
 }
+
 void aditivni_izraz(node *root) {
 	// 	<aditivni_izraz> ::= <multiplikativni_izraz>
 	// tip ←<multiplikativni_izraz>.tip
@@ -853,7 +869,263 @@ void izraz(node *root) {
 	}
 	return;
 }
-void prijevodna_jedinica(node *root) {}
+
+void slozena_naredba(node *root) {
+	// <slozena_naredba> ::= L_VIT_ZAGRADA <lista_naredbi> D_VIT_ZAGRADA
+	if (root->children.size() == 3 &&
+		root->children.at(1).symbol == "<lista_naredbi>") {
+		// 1. provjeri(<lista_naredbi>)
+		lista_naredbi(&root->children.at(1));
+	}
+	// <slozena_naredba> ::= L_VIT_ZAGRADA <lista_deklaracija> <lista_naredbi>
+	// D_VIT_ZAGRADA
+	else if (root->children.size() == 3 &&
+			 root->children.at(1).symbol == "<lista_deklaracija>" &&
+			 root->children.at(2).symbol == "<lista_naredbi>") {
+		// 1. provjeri(<lista_deklaracija>)
+		// 2. provjeri(<lista_naredbi>)
+		lista_deklaracija(&root->children.at(1));
+		lista_naredbi(&root->children.at(2));
+	} else {
+		semantic_error(root);
+	}
+	return;
+}
+
+void lista_naredbi(node *root) {
+	// <lista_naredbi> ::= <naredba>
+	if (root->children.size() == 1 &&
+		root->children.at(0).symbol == "<naredba>") {
+		// 1. provjeri(<naredba>)
+		naredba(&root->children.at(0));
+	}
+	// <lista_naredbi> ::= <lista_naredbi> <naredba>
+	else if (root->children.size() == 2 &&
+			 root->children.at(0).symbol == "<lista_naredbi>" &&
+			 root->children.at(1).symbol == "<naredba>") {
+		// 1. provjeri(<lista_naredbi>)
+		// 2. provjeri(<naredba>)
+		lista_naredbi(&root->children.at(0));
+		naredba(&root->children.at(1));
+	} else {
+		semantic_error(root);
+	}
+	return;
+}
+
+void naredba(node *root) {
+	// Nezavrsni znak <naredba> generira blokove (<slozena_naredba>) i
+	// razlicite vrste jednostavnih naredbi (<izraz_naredba>,
+	// <naredba_grananja>, <naredba_petlje> i <naredba_skoka>). Kako su sve
+	// produkcije jedinicne (s desne strane imaju jedan nezavrsni znak) i u
+	// svim produkcijama se provjeravaju semanticka pravila na znaku s desne
+	// strane, produkcije ovdje nisu prikazane.
+	if (root->children.size() == 1) {
+		if (root->children.at(0).symbol == "<slozena_naredba>") {
+			slozena_naredba(&root->children.at(0));
+		} else if (root->children.at(0).symbol == "<izraz_naredba>") {
+			izraz_naredba(&root->children.at(0));
+		} else if (root->children.at(0).symbol == "<naredba_grananja>") {
+			naredba_grananja(&root->children.at(0));
+		} else if (root->children.at(0).symbol == "<naredba_petlje>") {
+			naredba_petlje(&root->children.at(0));
+		} else if (root->children.at(0).symbol == "<naredba_skoka>") {
+			naredba_skoka(&root->children.at(0));
+		} else {
+			semantic_error(root);
+		}
+	} else {
+		semantic_error(root);
+	}
+	return;
+}
+
+void izraz_naredba(node *root) {
+	// <izraz_naredba> ::= TOCKAZAREZ
+	// tip ← int
+	if (root->children.size() == 1 &&
+		root->children.at(0).symbol == "TOCKAZAREZ") {
+		root->type = "int";
+	}
+	// 	<izraz_naredba> ::= <izraz> TOCKAZAREZ
+	// tip ← <izraz>.tip
+	else if (root->children.size() == 2 &&
+			 root->children.at(0).symbol == "<izraz>" &&
+			 root->children.at(1).symbol == "TOCKAZAREZ") {
+		// 1. provjeri(<izraz>)
+		izraz(&root->children.at(0));
+		root->type = root->children.at(0).type;
+	} else {
+		semantic_error(root);
+	}
+	return;
+}
+
+void naredba_grananja(node *root) {
+	// 	<naredba_grananja> ::= KR_IF L_ZAGRADA <izraz> D_ZAGRADA <naredba>
+	if (root->children.size() == 5) {
+		// 1. provjeri(<izraz>)
+		// 2. <izraz>.tip ∼ int
+		// 3. provjeri(<naredba>)
+		izraz(&root->children.at(2));
+		if (!implicit_conversion(root->children.at(2).type, "int")) {
+			semantic_error(root);
+		} else {
+			naredba(&root->children.at(4));
+		}
+	}
+	// <naredba_grananja> ::= KR_IF L_ZAGRADA <izraz> D_ZAGRADA <naredba>1
+	// KR_ELSE <naredba>2
+	else if (root->children.size() == 7) {
+		// 1. provjeri(<izraz>)
+		// 2. <izraz>.tip ∼ int
+		// 3. provjeri(<naredba>1)
+		// 4. provjeri(<naredba>2)
+		izraz(&root->children.at(2));
+		if (!implicit_conversion(root->children.at(2).type, "int")) {
+			semantic_error(root);
+		} else {
+			naredba(&root->children.at(4));
+			naredba(&root->children.at(6));
+		}
+	} else {
+		semantic_error(root);
+	}
+	return;
+}
+
+void naredba_petlje(node *root) {
+	++loop_depth;
+	// <naredba_petlje> ::= KR_WHILE L_ZAGRADA <izraz> D_ZAGRADA <naredba>
+	if (root->children.size() == 5) {
+		// 1. provjeri(<izraz>)
+		// 2. <izraz>.tip ∼ int
+		// 3. provjeri(<naredba>)
+		izraz(&root->children.at(2));
+		if (!implicit_conversion(root->children.at(2).type, "int")) {
+			semantic_error(root);
+		} else {
+			naredba(&root->children.at(4));
+		}
+	}
+	// <naredba_petlje> ::= KR_FOR L_ZAGRADA <izraz_naredba>1 <izraz_naredba>2
+	// D_ZAGRADA <naredba>
+	else if (root->children.size() == 6) {
+		// 1. provjeri(<izraz_naredba>1)
+		// 2. provjeri(<izraz_naredba>2)
+		// 3.<izraz_naredba>2.tip ∼ int
+		// 4. provjeri(<naredba>)
+		izraz_naredba(&root->children.at(2));
+		izraz_naredba(&root->children.at(3));
+		if (!implicit_conversion(root->children.at(3).type, "int")) {
+			semantic_error(root);
+		} else {
+			naredba(&root->children.at(5));
+		}
+	}
+	// <naredba_petlje> ::= KR_FOR L_ZAGRADA <izraz_naredba>1 <izraz_naredba>2
+	// <izraz> D_ZAGRADA <naredba>
+	else if (root->children.size() == 7) {
+		// 1. provjeri(<izraz_naredba>1)
+		// 2. provjeri(<izraz_naredba>2)
+		// 3. <izraz_naredba>2.tip ∼ int
+		// 4. provjeri(<izraz>)
+		// 5. provjeri(<naredba>)
+		izraz_naredba(&root->children.at(2));
+		izraz_naredba(&root->children.at(3));
+		if (!implicit_conversion(root->children.at(3).type, "int")) {
+			semantic_error(root);
+		} else {
+			izraz(&root->children.at(4));
+			naredba(&root->children.at(6));
+		}
+	} else {
+		semantic_error(root);
+	}
+	--loop_depth;
+	return;
+}
+
+void naredba_skoka(node *root) {
+	// <naredba_skoka> ::= (KR_CONTINUE | KR_BREAK) TOCKAZAREZ
+	if (root->children.size() == 2 &&
+		(root->children.at(0).symbol == "KR_CONTINUE" ||
+		 root->children.at(0).symbol == "KR_BREAK") &&
+		root->children.at(1).symbol == "TOCKAZAREZ") {
+		// 1. naredba se nalazi unutar petlje ili unutar bloka koji je
+		// ugnijezden u petlji
+		if (loop_depth == 0) {
+			semantic_error(root);
+		}
+	}
+	// <naredba_skoka> ::= KR_RETURN TOCKAZAREZ
+	else if (root->children.size() == 2 &&
+			 root->children.at(0).symbol == "KR_RETURN" &&
+			 root->children.at(1).symbol == "TOCKAZAREZ") {
+		// 1. naredba se nalazi unutar funkcije tipa funkcija(params → void)
+		if (current_function_return_type != "void") {
+			semantic_error(root);
+		}
+
+	}
+	// <naredba_skoka> ::= KR_RETURN <izraz> TOCKAZAREZ
+	else if (root->children.size() == 3) {
+		// 1. provjeri(<izraz>)
+		// 2. naredba se nalazi unutar funkcije tipa funkcija(params → pov) i
+		// vrijedi <izraz>.tip ∼ pov
+		izraz(&root->children.at(1));
+		if (current_function_return_type == "void" ||
+			current_function_return_type == "" ||
+			!implicit_conversion(root->children.at(1).type,
+								 current_function_return_type)) {
+			semantic_error(root);
+		}
+	} else {
+		semantic_error(root);
+	}
+	return;
+}
+
+void prijevodna_jedinica(node *root) {
+	// <prijevodna_jedinica> ::= <vanjska_deklaracija>
+	if (root->children.size() == 1 &&
+		root->children.at(0).symbol == "<vanjska_deklaracija>") {
+		// 1. provjeri(<vanjska_deklaracija>)
+		vanjska_deklaracija(&root->children.at(0));
+	}
+	// <prijevodna_jedinica> ::= <prijevodna_jedinica> <vanjska_deklaracija>
+	else if (root->children.size() == 2 &&
+			 root->children.at(0).symbol == "<prijevodna_jedinica>" &&
+			 root->children.at(1).symbol == "<vanjska_deklaracija>") {
+		// 1. provjeri(<prijevodna_jedinica>)
+		// 2. provjeri(<vanjska_deklaracija>)
+		prijevodna_jedinica(&root->children.at(0));
+		vanjska_deklaracija(&root->children.at(1));
+	} else {
+		semantic_error(root);
+	}
+	return;
+}
+
+void vanjska_deklaracija(node *root) {
+	// Nezavrsni znak <vanjska_deklaracija> generira ili definiciju funkcije
+	// (znak <definicija_funkcije>) ili deklaraciju varijable ili funkcije (znak
+	// <deklaracija>). Obje produkcije su jedinicne
+	// i u obje se provjeravaju pravila u podstablu kojem je znak s desne strane
+	// korijen.
+	if (root->children.size() == 1) {
+		if (root->children.at(0).symbol == "<definicija_funkcije>") {
+			definicija_funkcije(&root->children.at(0));
+		} else if (root->children.at(0).symbol == "<deklaracija>") {
+			deklaracija(&root->children.at(0));
+		} else {
+			semantic_error(root);
+		}
+	} else {
+		semantic_error(root);
+	}
+	return;
+}
 
 int main(void) {
 	std::string line;
