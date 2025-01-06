@@ -8,7 +8,7 @@ RED = "\033[31m"
 BLUE = "\033[34m"
 GREEN = "\033[32m"
 
-semdir = input("Unesit ime direktorija gdje vam je kod: ")
+semdir = "semAnalysis"
 
 cwd = os.getcwd()
 test = cwd + "/integration"
