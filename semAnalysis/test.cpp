@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <iostream>
+#include <memory>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -20,7 +21,7 @@ class node {
 	int row, depth, element_count, input_row;
 	std::vector<std::string> arg_types, arg_names, param_types;
 	std::string symbol, value;
-	std::vector<node *> children;
+	std::vector<std::shared_ptr<node>> children;
 
 	node(std::string symbol, int row, std::string value, int depth) {
 		this->symbol = symbol;
@@ -40,7 +41,7 @@ class node {
 		// for debug
 		// std::cout << input_row << std::endl;
 		std::cout << symbol << " ::=";
-		for (node *current : children) {
+		for (const std::shared_ptr<node> &current : children) {
 			std::cout << ' ' << current->symbol;
 			if (current->row >= 0) {
 				std::cout << '(' << current->row << ',' << current->value
@@ -52,7 +53,6 @@ class node {
 		return 1;
 	}
 };
-std::vector<node *> all_nodes;
 int loop_depth = 0; // tracks the depth of the loop
 std::vector<std::string> current_function_argument_types;
 std::vector<std::string> current_function_argument_names;
@@ -175,45 +175,45 @@ std::string remove_array(std::string type) {
 }
 
 // production functions
-int primarni_izraz(node *root);
-int postfiks_izraz(node *root);
-int lista_argumenata(node *root);
-int unarni_izraz(node *root);
-int cast_izraz(node *root);
-int ime_tipa(node *root);
-int specifikator_tipa(node *root);
-int multiplikativni_izraz(node *root);
-int aditivni_izraz(node *root);
-int odnosni_izraz(node *root);
-int jednakosni_izraz(node *root);
-int bin_i_izraz(node *root);
-int bin_xili_izraz(node *root);
-int bin_ili_izraz(node *root);
-int log_i_izraz(node *root);
-int log_ili_izraz(node *root);
-int izraz_pridruzivanja(node *root);
-int izraz(node *root);
-int slozena_naredba(node *root);
-int lista_naredbi(node *root);
-int naredba(node *root);
-int izraz_naredba(node *root);
-int naredba_grananja(node *root);
-int naredba_petlje(node *root);
-int naredba_skoka(node *root);
-int prijevodna_jedinica(node *root);
-int vanjska_deklaracija(node *root);
-int definicija_funkcije(node *root);
-int lista_parametara(node *root);
-int deklaracija_parametra(node *root);
-int lista_deklaracija(node *root);
-int deklaracija(node *root);
-int lista_init_deklaratora(node *root);
-int init_deklarator(node *root);
-int izravni_deklarator(node *root);
-int inicijalizator(node *root);
-int lista_izraza_pridruzivanja(node *root);
+int primarni_izraz(std::shared_ptr<node> root);
+int postfiks_izraz(std::shared_ptr<node> root);
+int lista_argumenata(std::shared_ptr<node> root);
+int unarni_izraz(std::shared_ptr<node> root);
+int cast_izraz(std::shared_ptr<node> root);
+int ime_tipa(std::shared_ptr<node> root);
+int specifikator_tipa(std::shared_ptr<node> root);
+int multiplikativni_izraz(std::shared_ptr<node> root);
+int aditivni_izraz(std::shared_ptr<node> root);
+int odnosni_izraz(std::shared_ptr<node> root);
+int jednakosni_izraz(std::shared_ptr<node> root);
+int bin_i_izraz(std::shared_ptr<node> root);
+int bin_xili_izraz(std::shared_ptr<node> root);
+int bin_ili_izraz(std::shared_ptr<node> root);
+int log_i_izraz(std::shared_ptr<node> root);
+int log_ili_izraz(std::shared_ptr<node> root);
+int izraz_pridruzivanja(std::shared_ptr<node> root);
+int izraz(std::shared_ptr<node> root);
+int slozena_naredba(std::shared_ptr<node> root);
+int lista_naredbi(std::shared_ptr<node> root);
+int naredba(std::shared_ptr<node> root);
+int izraz_naredba(std::shared_ptr<node> root);
+int naredba_grananja(std::shared_ptr<node> root);
+int naredba_petlje(std::shared_ptr<node> root);
+int naredba_skoka(std::shared_ptr<node> root);
+int prijevodna_jedinica(std::shared_ptr<node> root);
+int vanjska_deklaracija(std::shared_ptr<node> root);
+int definicija_funkcije(std::shared_ptr<node> root);
+int lista_parametara(std::shared_ptr<node> root);
+int deklaracija_parametra(std::shared_ptr<node> root);
+int lista_deklaracija(std::shared_ptr<node> root);
+int deklaracija(std::shared_ptr<node> root);
+int lista_init_deklaratora(std::shared_ptr<node> root);
+int init_deklarator(std::shared_ptr<node> root);
+int izravni_deklarator(std::shared_ptr<node> root);
+int inicijalizator(std::shared_ptr<node> root);
+int lista_izraza_pridruzivanja(std::shared_ptr<node> root);
 
-int primarni_izraz(node *root) {
+int primarni_izraz(std::shared_ptr<node> root) {
 	// <primarni_izraz> ::= IDN
 	// tip ← IDN.tip
 	// l-izraz ← IDN.l-izraz
@@ -373,7 +373,7 @@ int primarni_izraz(node *root) {
 	return 0;
 }
 
-int postfiks_izraz(node *root) {
+int postfiks_izraz(std::shared_ptr<node> root) {
 	// <postfiks_izraz> ::= <primarni_izraz>
 	// tip ← <primarni_izraz>.tip
 	// l-izraz ← <primarni_izraz>.l-izraz
@@ -505,7 +505,7 @@ int postfiks_izraz(node *root) {
 	return 0;
 }
 
-int lista_argumenata(node *root) {
+int lista_argumenata(std::shared_ptr<node> root) {
 	// <lista_argumenata> ::= <izraz_pridruzivanja>
 	// tipovi ← [<izraz_pridruzivanja>.tip ]
 	if (root->children.size() == 1 &&
@@ -529,7 +529,7 @@ int lista_argumenata(node *root) {
 	return 0;
 }
 
-int unarni_izraz(node *root) {
+int unarni_izraz(std::shared_ptr<node> root) {
 	// 	<unarni_izraz> ::= <postfiks_izraz>
 	// tip ← <postfiks_izraz>.tip
 	// l-izraz ← <postfiks_izraz>.l-izraz
@@ -592,7 +592,7 @@ int unarni_izraz(node *root) {
 	return 0;
 }
 
-int cast_izraz(node *root) {
+int cast_izraz(std::shared_ptr<node> root) {
 	// <cast_izraz> ::= <unarni_izraz>
 	// tip ← <unarni_izraz>.tip
 	// l-izraz ← <unarni_izraz>.l-izraz
@@ -625,7 +625,7 @@ int cast_izraz(node *root) {
 	return 0;
 }
 
-int ime_tipa(node *root) {
+int ime_tipa(std::shared_ptr<node> root) {
 	// <ime_tipa> ::= <specifikator_tipa>
 	// tip ← <specifikator_tipa>.tip
 	if (root->children.size() == 1 &&
@@ -654,7 +654,7 @@ int ime_tipa(node *root) {
 	return 0;
 }
 
-int specifikator_tipa(node *root) {
+int specifikator_tipa(std::shared_ptr<node> root) {
 	if (root->children.size() == 1) {
 		// <specifikator_tipa> ::= KR_VOID
 		// tip ← void
@@ -679,7 +679,7 @@ int specifikator_tipa(node *root) {
 	return 0;
 }
 
-int multiplikativni_izraz(node *root) {
+int multiplikativni_izraz(std::shared_ptr<node> root) {
 	// <multiplikativni_izraz> ::= <cast_izraz>
 	// tip ← <cast_izraz>.tip
 	// l-izraz ← <cast_izraz>.l-izraz
@@ -719,7 +719,7 @@ int multiplikativni_izraz(node *root) {
 	return 0;
 }
 
-int aditivni_izraz(node *root) {
+int aditivni_izraz(std::shared_ptr<node> root) {
 	// 	<aditivni_izraz> ::= <multiplikativni_izraz>
 	// tip ←<multiplikativni_izraz>.tip
 	// l-izraz ← <multiplikativni_izraz>.l-izraz
@@ -771,7 +771,7 @@ int aditivni_izraz(node *root) {
 	return 0;
 }
 
-int odnosni_izraz(node *root) {
+int odnosni_izraz(std::shared_ptr<node> root) {
 	// <odnosni_izraz> ::= <aditivni_izraz>
 	// tip ← <aditivni_izraz>.tip
 	// l-izraz ← <aditivni_izraz>.l-izraz
@@ -813,7 +813,7 @@ int odnosni_izraz(node *root) {
 	return 0;
 }
 
-int jednakosni_izraz(node *root) {
+int jednakosni_izraz(std::shared_ptr<node> root) {
 	// <jednakosni_izraz> ::= <odnosni_izraz>
 	// tip ← <odnosni_izraz>.tip
 	// l-izraz ← <odnosni_izraz>.l-izraz
@@ -853,7 +853,7 @@ int jednakosni_izraz(node *root) {
 	return 0;
 }
 
-int bin_i_izraz(node *root) {
+int bin_i_izraz(std::shared_ptr<node> root) {
 	// <bin_i_izraz> ::= <jednakosni_izraz>
 	// tip ← <jednakosni_izraz>.tip
 	// l-izraz ← <jednakosni_izraz>.l-izraz
@@ -891,7 +891,7 @@ int bin_i_izraz(node *root) {
 	return 0;
 }
 
-int bin_xili_izraz(node *root) {
+int bin_xili_izraz(std::shared_ptr<node> root) {
 	// 	<bin_xili_izraz> ::= <bin_i_izraz>
 	// tip ← <bin_i_izraz>.tip
 	// l-izraz ← <bin_i_izraz>.l-izraz
@@ -928,7 +928,7 @@ int bin_xili_izraz(node *root) {
 	return 0;
 }
 
-int bin_ili_izraz(node *root) {
+int bin_ili_izraz(std::shared_ptr<node> root) {
 	// <bin_ili_izraz> ::= <bin_xili_izraz>
 	// tip ← <bin_xili_izraz>.tip
 	// l-izraz ← <bin_xili_izraz>.l-izraz
@@ -966,7 +966,7 @@ int bin_ili_izraz(node *root) {
 	return 0;
 }
 
-int log_i_izraz(node *root) {
+int log_i_izraz(std::shared_ptr<node> root) {
 	// <log_i_izraz> ::= <bin_ili_izraz>
 	// tip ← <bin_ili_izraz>.tip
 	// l-izraz ← <bin_ili_izraz>.l-izraz
@@ -1004,7 +1004,7 @@ int log_i_izraz(node *root) {
 	return 0;
 }
 
-int log_ili_izraz(node *root) {
+int log_ili_izraz(std::shared_ptr<node> root) {
 	// <log_ili_izraz> ::= <log_i_izraz>
 	// tip ← <log_i_izraz>.tip
 	// l-izraz ← <log_i_izraz>.l-izraz
@@ -1042,7 +1042,7 @@ int log_ili_izraz(node *root) {
 	return 0;
 }
 
-int izraz_pridruzivanja(node *root) {
+int izraz_pridruzivanja(std::shared_ptr<node> root) {
 	// <izraz_pridruzivanja> ::= <log_ili_izraz>
 	// tip ← <log_ili_izraz>.tip
 	// l-izraz ← <log_ili_izraz>.l-izraz
@@ -1093,7 +1093,7 @@ int izraz_pridruzivanja(node *root) {
 	return 0;
 }
 
-int izraz(node *root) {
+int izraz(std::shared_ptr<node> root) {
 	// <izraz> ::= <izraz_pridruzivanja>
 	// tip ← <izraz_pridruzivanja>.tip
 	// l-izraz ← <izraz_pridruzivanja>.l-izraz
@@ -1132,7 +1132,7 @@ int izraz(node *root) {
 	return 0;
 }
 
-int slozena_naredba(node *root) {
+int slozena_naredba(std::shared_ptr<node> root) {
 	++block_count;
 	if (from_function) {
 		local_names.clear();
@@ -1211,7 +1211,7 @@ int slozena_naredba(node *root) {
 	return 0;
 }
 
-int lista_naredbi(node *root) {
+int lista_naredbi(std::shared_ptr<node> root) {
 	// <lista_naredbi> ::= <naredba>
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<naredba>") {
@@ -1232,7 +1232,7 @@ int lista_naredbi(node *root) {
 	return 0;
 }
 
-int naredba(node *root) {
+int naredba(std::shared_ptr<node> root) {
 	// Nezavrsni znak <naredba> generira blokove (<slozena_naredba>) i
 	// razlicite vrste jednostavnih naredbi (<izraz_naredba>,
 	// <naredba_grananja>, <naredba_petlje> i <naredba_skoka>). Kako su sve
@@ -1259,7 +1259,7 @@ int naredba(node *root) {
 	return 0;
 }
 
-int izraz_naredba(node *root) {
+int izraz_naredba(std::shared_ptr<node> root) {
 	// <izraz_naredba> ::= TOCKAZAREZ
 	// tip ← int
 	if (root->children.size() == 1 &&
@@ -1283,7 +1283,7 @@ int izraz_naredba(node *root) {
 	return 0;
 }
 
-int naredba_grananja(node *root) {
+int naredba_grananja(std::shared_ptr<node> root) {
 	// 	<naredba_grananja> ::= KR_IF L_ZAGRADA <izraz> D_ZAGRADA <naredba>
 	if (root->children.size() == 5) {
 		// 1. provjeri(<izraz>)
@@ -1316,7 +1316,7 @@ int naredba_grananja(node *root) {
 	return 0;
 }
 
-int naredba_petlje(node *root) {
+int naredba_petlje(std::shared_ptr<node> root) {
 	++loop_depth;
 	// <naredba_petlje> ::= KR_WHILE L_ZAGRADA <izraz> D_ZAGRADA <naredba>
 	if (root->children.size() == 5) {
@@ -1368,7 +1368,7 @@ int naredba_petlje(node *root) {
 	return 0;
 }
 
-int naredba_skoka(node *root) {
+int naredba_skoka(std::shared_ptr<node> root) {
 	// <naredba_skoka> ::= (KR_CONTINUE | KR_BREAK) TOCKAZAREZ
 	if (root->children.size() == 2 &&
 		(root->children.at(0)->symbol == "KR_CONTINUE" ||
@@ -1415,7 +1415,7 @@ int naredba_skoka(node *root) {
 	return 0;
 }
 
-int prijevodna_jedinica(node *root) {
+int prijevodna_jedinica(std::shared_ptr<node> root) {
 	// <prijevodna_jedinica> ::= <vanjska_deklaracija>
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<vanjska_deklaracija>") {
@@ -1436,7 +1436,7 @@ int prijevodna_jedinica(node *root) {
 	return 0;
 }
 
-int vanjska_deklaracija(node *root) {
+int vanjska_deklaracija(std::shared_ptr<node> root) {
 	// Nezavrsni znak <vanjska_deklaracija> generira ili definiciju funkcije
 	// (znak <definicija_funkcije>) ili deklaraciju varijable ili funkcije
 	// (znak <deklaracija>). Obje produkcije su jedinicne i u obje se
@@ -1460,7 +1460,7 @@ int vanjska_deklaracija(node *root) {
 	return 0;
 }
 
-int definicija_funkcije(node *root) {
+int definicija_funkcije(std::shared_ptr<node> root) {
 	// <definicija_funkcije> ::= <ime_tipa> IDN L_ZAGRADA KR_VOID D_ZAGRADA
 	// <slozena_naredba>
 	if (root->children.size() == 6 &&
@@ -1639,7 +1639,7 @@ int definicija_funkcije(node *root) {
 	return 0;
 }
 
-int lista_parametara(node *root) {
+int lista_parametara(std::shared_ptr<node> root) {
 	// 	<lista_parametara> ::= <deklaracija_parametra>
 	// tipovi ← [<deklaracija_parametra>.tip ]
 	// imena ← [ <deklaracija_parametra>.ime ]
@@ -1689,7 +1689,7 @@ int lista_parametara(node *root) {
 	return 0;
 }
 
-int deklaracija_parametra(node *root) {
+int deklaracija_parametra(std::shared_ptr<node> root) {
 	// <deklaracija_parametra> ::= <ime_tipa> IDN
 	// tip ← <ime_tipa>.tip
 	// ime ← IDN.ime
@@ -1731,7 +1731,7 @@ int deklaracija_parametra(node *root) {
 	return 0;
 }
 
-int lista_deklaracija(node *root) {
+int lista_deklaracija(std::shared_ptr<node> root) {
 	// <lista_deklaracija> ::= <deklaracija>
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<deklaracija>") {
@@ -1759,7 +1759,7 @@ int lista_deklaracija(node *root) {
 	return 0;
 }
 
-int deklaracija(node *root) {
+int deklaracija(std::shared_ptr<node> root) {
 	// <deklaracija> ::= <ime_tipa> <lista_init_deklaratora> TOCKAZAREZ
 	if (root->children.size() == 3 &&
 		root->children.at(0)->symbol == "<ime_tipa>" &&
@@ -1782,7 +1782,7 @@ int deklaracija(node *root) {
 	return 0;
 }
 
-int lista_init_deklaratora(node *root) {
+int lista_init_deklaratora(std::shared_ptr<node> root) {
 	// <lista_init_deklaratora> ::= <init_deklarator>
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<init_deklarator>") {
@@ -1818,7 +1818,7 @@ int lista_init_deklaratora(node *root) {
 	return 0;
 }
 
-int init_deklarator(node *root) {
+int init_deklarator(std::shared_ptr<node> root) {
 	// 	<init_deklarator> ::= <izravni_deklarator>
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<izravni_deklarator>") {
@@ -1886,7 +1886,7 @@ int init_deklarator(node *root) {
 	return 0;
 }
 
-int izravni_deklarator(node *root) {
+int izravni_deklarator(std::shared_ptr<node> root) {
 	// 	<izravni_deklarator> ::= IDN
 	// tip ← ntip
 	if (root->children.size() == 1 && root->children.at(0)->symbol == "IDN") {
@@ -2040,7 +2040,7 @@ int izravni_deklarator(node *root) {
 	return 0;
 }
 
-int inicijalizator(node *root) {
+int inicijalizator(std::shared_ptr<node> root) {
 	// 	<inicijalizator> ::= <izraz_pridruzivanja>
 	// ako je <izraz_pridruzivanja> ⇒∗ NIZ_ZNAKOVA
 	// br-elem ← duljina niza znakova + 1
@@ -2058,7 +2058,7 @@ int inicijalizator(node *root) {
 			// generiranja je <izraz_pridruzivanja> ⇒ <log_ili_izraz> ⇒ ...
 			// ⇒ <primarni_izraz> ⇒ NIZ_ZNAKOVA. only 1 element on right
 			// side of all deeper productions
-			node *current = root->children.at(0);
+			std::shared_ptr<node> current = root->children.at(0);
 			while (current->children.size() == 1 &&
 				   current->symbol != "NIZ_ZNAKOVA") {
 				current = current->children.at(0);
@@ -2094,7 +2094,7 @@ int inicijalizator(node *root) {
 	return 0;
 }
 
-int lista_izraza_pridruzivanja(node *root) {
+int lista_izraza_pridruzivanja(std::shared_ptr<node> root) {
 	// 	<lista_izraza_pridruzivanja> ::= <izraz_pridruzivanja>
 	// tipovi ← [ <izraz_pridruzivanja>.tip ]
 	// br-elem ← 1
@@ -2139,6 +2139,7 @@ int lista_izraza_pridruzivanja(node *root) {
 int main(void) {
 	std::string line;
 	int input_row = 0;
+	std::vector<std::shared_ptr<node>> all_nodes;
 	while (std::getline(std::cin, line)) {
 		++input_row;
 		int current_depth = 0, current_row = -1;
@@ -2147,7 +2148,6 @@ int main(void) {
 		while (line.at(current_depth) == ' ') {
 			++current_depth;
 		}
-
 		if (line.at(current_depth) == '<') {
 			current_symbol = line.substr(current_depth);
 		} else {
@@ -2158,8 +2158,8 @@ int main(void) {
 			line = line.substr(line.find(' ') + 1);
 			current_value = line;
 		}
-		node *current_node =
-			new node(current_symbol, current_row, current_value, current_depth);
+		std::shared_ptr<node> current_node = std::make_unique<node>(
+			node(current_symbol, current_row, current_value, current_depth));
 		current_node->input_row = input_row;
 		if (all_nodes.empty()) {
 			all_nodes.push_back(current_node);
@@ -2176,6 +2176,15 @@ int main(void) {
 		}
 	}
 	// assuming there is something in the input if not it is correct ?
+	// for (auto x : all_nodes) {
+	// 	std::cout << x->symbol << std::endl;
+	// 	std::cout << ":>" << std::endl;
+	// 	for (auto y : x->children) {
+	// 		std::cout << y->symbol << " ";
+	// 	}
+	// 	std::cout << std::endl;
+	// 	std::cout << "--------------------------" << std::endl;
+	// }
 	if (prijevodna_jedinica(all_nodes.at(0)) == 0) {
 		if (!main_defined) {
 			std::cout << "main" << std::endl;

@@ -16,7 +16,9 @@ os.chdir(test)
 items = os.listdir()
 os.chdir(cwd)
 ts, cr = 0, 0
-for it in items:
+for it in sorted(items):
+    if it == ".DS_Store":
+        continue
     ts += 1
     print(BLUE + f"TESTING {it}" + RESET)
     subprocess.run(["cp", "integration/" + it + "/test.in", semdir + "/"])
