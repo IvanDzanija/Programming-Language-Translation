@@ -53,9 +53,10 @@ int loop_depth = 0; // tracks the depth of the loop
 std::vector<std::string> current_function_argument_types;
 std::string current_function_return_type = "";
 std::unordered_set<std::string> defined_functions;
+std::unordered_multiset<std::string> declared_functions;
 std::unordered_map<std::string,
 				   std::pair<std::string, std::vector<std::string>>>
-	declared_functions;
+	global_declared_functions;
 
 std::unordered_set<std::string> local_names;
 std::unordered_multimap<std::string, std::pair<int, std::string>>
@@ -367,6 +368,7 @@ int postfiks_izraz(node *root) {
 		if (primarni_izraz(root->children.at(0))) {
 			return 1;
 		} else {
+			root->return_type = root->children.at(0)->return_type;
 			root->type = root->children.at(0)->type;
 			root->lhs = root->children.at(0)->lhs;
 		}
@@ -993,14 +995,14 @@ int log_ili_izraz(node *root) {
 		} else {
 			log_i_izraz(root->children.at(2));
 			if (!implicit_conversion(root->children.at(2)->type, "int")) {
-				root->semantic_error();
+				return root->semantic_error();
 			} else {
 				root->type = "int";
 				root->lhs = false;
 			}
 		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -1012,9 +1014,12 @@ int izraz_pridruzivanja(node *root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<log_ili_izraz>") {
 		// 1. provjeri(<log_ili_izraz>)
-		log_ili_izraz(root->children.at(0));
-		root->type = root->children.at(0)->type;
-		root->lhs = root->children.at(0)->lhs;
+		if (log_ili_izraz(root->children.at(0))) {
+			return 1;
+		} else {
+			root->type = root->children.at(0)->type;
+			root->lhs = root->children.at(0)->lhs;
+		}
 	}
 	// <izraz_pridruzivanja> ::= <postfiks_izraz> OP_PRIDRUZI
 	// <izraz_pridruzivanja>
@@ -1026,21 +1031,25 @@ int izraz_pridruzivanja(node *root) {
 		// 2. <postfiks_izraz>.l-izraz = 1
 		// 3. provjeri(<izraz_pridruzivanja>)
 		// 4. <izraz_pridruzivanja>.tip ∼ <postfiks_izraz>.tip
-		postfiks_izraz(root->children.at(0));
-		if (!root->children.at(0)->lhs) {
-			root->semantic_error();
+
+		if (postfiks_izraz(root->children.at(0))) {
+			return 1;
 		} else {
-			izraz_pridruzivanja(root->children.at(2));
-			if (!implicit_conversion(root->children.at(2)->type,
-									 root->children.at(0)->type)) {
-				root->semantic_error();
+			if (!root->children.at(0)->lhs) {
+				return root->semantic_error();
 			} else {
-				root->type = root->children.at(0)->type;
-				root->lhs = false;
+				izraz_pridruzivanja(root->children.at(2));
+				if (!implicit_conversion(root->children.at(2)->type,
+										 root->children.at(0)->type)) {
+					return root->semantic_error();
+				} else {
+					root->type = root->children.at(0)->type;
+					root->lhs = false;
+				}
 			}
 		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -1052,9 +1061,12 @@ int izraz(node *root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<izraz_pridruzivanja>") {
 		// 1. provjeri(<izraz_pridruzivanja>)
-		izraz_pridruzivanja(root->children.at(0));
-		root->type = root->children.at(0)->type;
-		root->lhs = root->children.at(0)->lhs;
+		if (izraz_pridruzivanja(root->children.at(0))) {
+			return 1;
+		} else {
+			root->type = root->children.at(0)->type;
+			root->lhs = root->children.at(0)->lhs;
+		}
 	}
 	// <izraz> ::= <izraz> ZAREZ <izraz_pridruzivanja>
 	// tip ← <izraz_pridruzivanja>.tip
@@ -1065,18 +1077,32 @@ int izraz(node *root) {
 			 root->children.at(2)->symbol == "<izraz_pridruzivanja>") {
 		// 1. provjeri(<izraz>)
 		// 2. provjeri(<izraz_pridruzivanja>)
-		izraz(root->children.at(0));
-		izraz_pridruzivanja(root->children.at(2));
-		root->type = root->children.at(2)->type;
-		root->lhs = false;
+		if (izraz(root->children.at(0))) {
+			return 1;
+		} else {
+			if (izraz_pridruzivanja(root->children.at(2))) {
+				return 1;
+			} else {
+				root->type = root->children.at(2)->type;
+				root->lhs = false;
+			}
+		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
 
 int slozena_naredba(node *root) {
 	++block_count;
+	for (auto function : available_functions) {
+		if (function.second.first == 0) {
+			std::string key = function.first;
+			std::pair<std::string, std::vector<std::string>> value = make_pair(
+				function.second.second.first, function.second.second.second);
+			global_declared_functions.insert(make_pair(key, value));
+		}
+	}
 	// <slozena_naredba> ::= L_VIT_ZAGRADA <lista_naredbi> D_VIT_ZAGRADA
 	if (root->children.size() == 3 &&
 		root->children.at(1)->symbol == "<lista_naredbi>") {
@@ -1124,6 +1150,7 @@ int slozena_naredba(node *root) {
 		if (function.second.first != block_count) {
 			new_available_functions.insert(function);
 		}
+		declared_functions.insert(function.first);
 	}
 	for (auto variable : available_variables) {
 		if (variable.second.first != block_count) {
@@ -1308,7 +1335,7 @@ int naredba_skoka(node *root) {
 			 root->children.at(1)->symbol == "TOCKAZAREZ") {
 		// 1. naredba se nalazi unutar funkcije tipa funkcija(params → void)
 		if (current_function_return_type != "void") {
-			root->semantic_error();
+			return root->semantic_error();
 		}
 
 	}
@@ -1317,15 +1344,19 @@ int naredba_skoka(node *root) {
 		// 1. provjeri(<izraz>)
 		// 2. naredba se nalazi unutar funkcije tipa funkcija(params → pov)
 		// i vrijedi <izraz>.tip ∼ pov
-		izraz(root->children.at(1));
-		if (current_function_return_type == "void" ||
-			current_function_return_type == "" ||
-			!implicit_conversion(root->children.at(1)->type,
-								 current_function_return_type)) {
-			root->semantic_error();
+		if (izraz(root->children.at(1))) {
+			return 1;
+		} else {
+			if (current_function_return_type == "void" ||
+				current_function_return_type == "" ||
+				!implicit_conversion(root->children.at(1)->type,
+									 current_function_return_type)) {
+				return root->semantic_error();
+			}
 		}
+
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -1411,8 +1442,8 @@ int definicija_funkcije(node *root) {
 						function_key =
 							make_pair(root->children.at(0)->type, arguments);
 					if (declared_functions.count(root->children.at(1)->value) &&
-						declared_functions.at(root->children.at(1)->value) !=
-							function_key) {
+						global_declared_functions.at(
+							root->children.at(1)->value) != function_key) {
 						return root->semantic_error();
 					} else {
 						defined_functions.insert(root->children.at(1)->value);
@@ -1426,11 +1457,13 @@ int definicija_funkcije(node *root) {
 						current_function_return_type =
 							root->children.at(0)->type;
 						current_function_argument_types = arguments;
-						slozena_naredba(root->children.at(5));
-
-						// reset
-						current_function_return_type.clear();
-						current_function_argument_types.clear();
+						if (slozena_naredba(root->children.at(5))) {
+							return 1;
+						} else {
+							// reset
+							current_function_return_type.clear();
+							current_function_argument_types.clear();
+						}
 					}
 				}
 			}
@@ -1469,7 +1502,7 @@ int definicija_funkcije(node *root) {
 				std::pair<std::string, std::vector<std::string>> function_key =
 					make_pair(root->children.at(0)->type, arguments);
 				if (declared_functions.count(root->children.at(1)->value) &&
-					declared_functions.at(root->children.at(1)->value) !=
+					global_declared_functions.at(root->children.at(1)->value) !=
 						function_key) {
 					return (root->semantic_error());
 				} else {
