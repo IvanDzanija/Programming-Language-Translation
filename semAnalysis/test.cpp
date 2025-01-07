@@ -18,9 +18,10 @@ class node {
 				return_type = "undefined";
 	bool lhs = false;
 	int row, depth, element_count, input_row;
-	std::vector<std::string> arg_types, arg_names;
+	std::vector<std::string> arg_types, arg_names, param_types;
 	std::string symbol, value;
 	std::vector<node *> children;
+
 	node(std::string symbol, int row, std::string value, int depth) {
 		this->symbol = symbol;
 		this->row = row;
@@ -36,6 +37,7 @@ class node {
 	}
 
 	int semantic_error(void) {
+		// for debug
 		// std::cout << input_row << std::endl;
 		std::cout << symbol << " ::=";
 		for (node *current : children) {
@@ -244,7 +246,7 @@ int primarni_izraz(node *root) {
 			std::vector<std::string> arguments;
 			for (auto it = range.first; it != range.second;
 				 it = std::next(it)) {
-				if (it->second.first > deepest_block) {
+				if (it->second.first >= deepest_block) {
 					deepest_block = it->second.first;
 					current_type = it->second.second.first;
 					if (it->second.second.second.size() > 0) {
@@ -257,6 +259,7 @@ int primarni_izraz(node *root) {
 			if (has_arguments) {
 				root->type += "params -> ";
 				root->arg_types = arguments;
+				root->param_types = arguments;
 			} else {
 				root->type += "void -> ";
 			}
@@ -374,6 +377,7 @@ int postfiks_izraz(node *root) {
 			return 1;
 		} else {
 			root->return_type = root->children.at(0)->return_type;
+			root->param_types = root->children.at(0)->param_types;
 			root->type = root->children.at(0)->type;
 			root->lhs = root->children.at(0)->lhs;
 		}
@@ -444,15 +448,22 @@ int postfiks_izraz(node *root) {
 		// 3. <postfiks_izraz>.tip = funkcija(params → pov) i redom po
 		// elementima arg-tip iz <lista_argumenata>.tipovi i param-tip iz
 		// params vrijedi arg-tip ∼ param-tip
-		postfiks_izraz(root->children.at(0));
-		lista_argumenata(root->children.at(2));
-		if (same_arguments(root->children.at(2)->arg_types,
-						   root->children.at(0)->arg_types)) {
-			root->semantic_error();
+		if (postfiks_izraz(root->children.at(0))) {
+			return 1;
 		} else {
-			root->type = root->children.at(0)->return_type;
-			root->lhs = false;
+			if (lista_argumenata(root->children.at(2))) {
+				return 1;
+			} else {
+				if (!same_arguments(root->children.at(2)->arg_types,
+									root->children.at(0)->param_types)) {
+					return root->semantic_error();
+				} else {
+					root->type = root->children.at(0)->return_type;
+					root->lhs = false;
+				}
+			}
 		}
+
 	}
 	// <postfiks_izraz> ::= <postfiks_izraz> (OP_INC | OP_DEC)
 	//  tip ← int
@@ -1345,7 +1356,10 @@ int naredba_skoka(node *root) {
 
 	}
 	// <naredba_skoka> ::= KR_RETURN <izraz> TOCKAZAREZ
-	else if (root->children.size() == 3) {
+	else if (root->children.size() == 3 &&
+			 root->children.at(0)->symbol == "KR_RETURN" &&
+			 root->children.at(1)->symbol == "<izraz>" &&
+			 root->children.at(2)->symbol == "TOCKAZAREZ") {
 		// 1. provjeri(<izraz>)
 		// 2. naredba se nalazi unutar funkcije tipa funkcija(params → pov)
 		// i vrijedi <izraz>.tip ∼ pov
@@ -1511,11 +1525,10 @@ int definicija_funkcije(node *root) {
 					if (lista_parametara(root->children.at(3))) {
 						return 1;
 					} else {
-						std::vector<std::string> arguments =
-							root->children.at(3)->arg_types;
 						std::pair<std::string, std::vector<std::string>>
-							function_key = make_pair(root->children.at(0)->type,
-													 arguments);
+							function_key =
+								make_pair(root->children.at(0)->type,
+										  root->children.at(3)->arg_types);
 						if (global_declared_functions.count(
 								root->children.at(1)->value) &&
 							global_declared_functions.at(
@@ -1544,7 +1557,8 @@ int definicija_funkcije(node *root) {
 								make_pair(block_count, function_key)));
 							current_function_return_type =
 								root->children.at(0)->type;
-							current_function_argument_types = arguments;
+							current_function_argument_types =
+								root->children.at(3)->arg_types;
 
 							for (size_t i = 0;
 								 i < root->children.at(3)->arg_types.size();
@@ -2124,6 +2138,5 @@ int main(void) {
 			std::cout << "funkcija" << std::endl;
 		}
 	}
-
 	return 0;
 }
