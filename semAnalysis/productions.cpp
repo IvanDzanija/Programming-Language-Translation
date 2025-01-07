@@ -33,10 +33,11 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 && root->children.at(0)->symbol == "IDN") {
 		// 1. IDN.ime je deklarirano
 		// check if its a variable
+		int deepest_block = -1;
+
 		if (available_variables.count(root->children.at(0)->value)) {
 			auto range =
 				available_variables.equal_range(root->children.at(0)->value);
-			int deepest_block = 0;
 			std::string current_type = "";
 			for (auto it = range.first; it != range.second;
 				 it = std::next(it)) {
@@ -53,53 +54,58 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 			}
 		}
 		// check if its a function
-		else if (available_functions.count(root->children.at(0)->value)) {
+		if (available_functions.count(root->children.at(0)->value)) {
 			auto range =
 				available_functions.equal_range(root->children.at(0)->value);
-			int deepest_block = 0;
 			std::string current_type = "";
 			bool has_arguments = false;
 			std::vector<std::string> arguments;
-			int i = 0;
+			bool convert = false;
 			for (auto it = range.first; it != range.second;
 				 it = std::next(it)) {
-				if (it->second.first >= deepest_block) {
+				if (it->second.first > deepest_block) {
 					deepest_block = it->second.first;
 					current_type = it->second.second.first;
+					convert = true;
 					if (it->second.second.second.size() > 0) {
 						has_arguments = true;
 						arguments = it->second.second.second;
 					}
 				}
 			}
-			root->type = "funkcija(";
-			if (has_arguments) {
-				root->type += "params -> ";
-				root->arg_types = arguments;
-				root->param_types = arguments;
-			} else {
-				root->type += "void -> ";
+			if (convert) {
+				root->type = "funkcija(";
+				if (has_arguments) {
+					root->type += "params -> ";
+					root->arg_types = arguments;
+					root->param_types = arguments;
+				} else {
+					root->type += "void -> ";
+				}
+				root->type += "pov)";
+				root->return_type = current_type;
+				root->lhs = false;
 			}
-			root->type += "pov)";
-			root->return_type = current_type;
-			root->lhs = false;
 		}
 		// check if its an array
-		else if (available_arrays.count(root->children.at(0)->value)) {
+		if (available_arrays.count(root->children.at(0)->value)) {
 			auto range =
 				available_arrays.equal_range(root->children.at(0)->value);
-			int deepest_block = 0;
 			std::string current_type = "";
+			bool convert = false;
 			for (auto it = range.first; it != range.second;
 				 it = std::next(it)) {
 				if (it->second.first > deepest_block) {
+					convert = true;
 					deepest_block = it->second.first;
 					current_type = it->second.second.first;
 				}
 			}
-			root->type = current_type;
-			root->lhs = false;
-		} else {
+			if (convert) {
+				root->type = current_type;
+				root->lhs = false;
+			}
+		} else if (deepest_block == -1) {
 			return root->semantic_error();
 		}
 	}
@@ -1011,7 +1017,9 @@ int slozena_naredba(std::shared_ptr<Node> root) {
 		if (function.second.first != block_count) {
 			new_available_functions.insert(function);
 		}
-		declared_functions.insert(function.first);
+		if (!defined_functions.count(function.first)) {
+			declared_functions.insert(function.first);
+		}
 	}
 	for (auto variable : available_variables) {
 		if (variable.second.first != block_count) {
@@ -1677,6 +1685,10 @@ int init_deklarator(std::shared_ptr<Node> root) {
 				} else {
 					std::string current_type =
 						remove_const(remove_array(root->children.at(0)->type));
+					if (root->children.at(2)->arg_types.size() !=
+						root->children.at(2)->element_count) {
+						return root->semantic_error();
+					}
 					for (std::string type : root->children.at(2)->arg_types) {
 						if (!implicit_conversion(type, current_type)) {
 							return root->semantic_error();

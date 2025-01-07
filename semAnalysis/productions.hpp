@@ -1,5 +1,8 @@
 #include "Node.hpp"
 #include <memory>
+#include <set>
+#include <unordered_map>
+#include <unordered_set>
 
 extern bool main_defined;
 extern std::multiset<std::string> declared_functions;

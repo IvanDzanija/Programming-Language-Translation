@@ -44,6 +44,15 @@ int main(void) {
 		}
 	}
 	// assuming there is something in the input if not it is correct ?
+	// for (auto x : all_nodes) {
+	// 	std::cout << x->symbol << std::endl;
+	// 	std::cout << ":>" << std::endl;
+	// 	for (auto y : x->children) {
+	// 		std::cout << y->symbol << " ";
+	// 	}
+	// 	std::cout << std::endl;
+	// 	std::cout << "--------------------------" << std::endl;
+	// }
 	if (prijevodna_jedinica(all_nodes.at(0)) == 0) {
 		if (!main_defined) {
 			std::cout << "main" << std::endl;

@@ -1,10 +1,6 @@
-#include <algorithm>
 #include <iostream>
 #include <memory>
-#include <set>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 class Node {
@@ -12,7 +8,7 @@ class Node {
 	std::string type = "undefined", inherited_type = "undefined", name,
 				return_type = "undefined";
 	bool lhs = false;
-	int row, depth, element_count, input_row;
+	int row, depth, element_count = -1, input_row;
 	std::vector<std::string> arg_types, arg_names, param_types;
 	std::string symbol, value;
 	std::vector<std::shared_ptr<Node>> children;
