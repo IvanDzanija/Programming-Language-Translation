@@ -13,7 +13,8 @@
 void debug() { std::cout << "I'm here" << std::endl; }
 class node {
   public:
-	std::string type = "undefined", inherited_type = "undefined", name;
+	std::string type = "undefined", inherited_type = "undefined", name,
+				return_type = "undefined";
 	bool lhs = false;
 	int row, depth, element_count;
 	std::vector<std::string> arg_types, arg_names;
@@ -236,14 +237,25 @@ int primarni_izraz(node *root) {
 				available_functions.equal_range(root->children.at(0)->value);
 			int deepest_block = 0;
 			std::string current_type = "";
+			bool has_arguments = false;
 			for (auto it = range.first; it != range.second;
 				 it = std::next(it)) {
 				if (it->second.first > deepest_block) {
 					deepest_block = it->second.first;
 					current_type = it->second.second.first;
+					if (it->second.second.second.size() > 0) {
+						has_arguments = true;
+					}
 				}
 			}
-			root->type = current_type;
+			root->type = "funkcija(";
+			if (has_arguments) {
+				root->type += "params -> ";
+			} else {
+				root->type += "void -> ";
+			}
+			root->type += "pov)";
+			root->return_type = current_type;
 			root->lhs = false;
 		}
 		// check if its an array
@@ -407,10 +419,10 @@ int postfiks_izraz(node *root) {
 		if (postfiks_izraz(root->children.at(0))) {
 			return 1;
 		} else {
-			if (root->children.at(0)->type != "funkcija(void → pov)") {
+			if (root->children.at(0)->type != "funkcija(void -> pov)") {
 				return root->semantic_error();
 			} else {
-				root->type = "pov"; // temporary
+				root->type = root->children.at(0)->return_type;
 				root->lhs = false;
 			}
 		}
@@ -431,7 +443,7 @@ int postfiks_izraz(node *root) {
 						   root->children.at(0)->arg_types)) {
 			root->semantic_error();
 		} else {
-			root->type = "pov"; // temporary
+			root->type = root->children.at(0)->return_type;
 			root->lhs = false;
 		}
 	}
@@ -1287,7 +1299,7 @@ int naredba_skoka(node *root) {
 		// 1. naredba se nalazi unutar petlje ili unutar bloka koji je
 		// ugnijezden u petlji
 		if (loop_depth == 0) {
-			root->semantic_error();
+			return root->semantic_error();
 		}
 	}
 	// <naredba_skoka> ::= KR_RETURN TOCKAZAREZ
@@ -1814,11 +1826,13 @@ int izravni_deklarator(node *root) {
 		// prethodne deklaracije je jednak funkcija(void → ntip)
 		// 2. zabiljezi deklaraciju IDN.ime s odgovarajucim tipom ako ista
 		// funkcija vec nije deklarirana u lokalnom djelokrugu
+		std::pair<int, std::pair<std::string, std::vector<std::string>>>
+			function_value =
+				make_pair(block_count, make_pair(root->inherited_type,
+												 std::vector<std::string>()));
 		if (local_names.count(root->children.at(0)->value)) {
-			std::pair<std::string, std::vector<std::string>> function_value =
-				make_pair(root->inherited_type, std::vector<std::string>());
-			if (declared_functions.count(root->children.at(0)->value)) {
-				if (declared_functions.at(root->children.at(0)->value) !=
+			if (available_functions.count(root->children.at(0)->value)) {
+				if (available_functions.at(root->children.at(0)->value) !=
 					function_value) {
 					return root->semantic_error();
 				}
@@ -1826,9 +1840,8 @@ int izravni_deklarator(node *root) {
 				return root->semantic_error();
 			}
 		} else {
-			declared_functions.insert(make_pair(
-				root->children.at(0)->value,
-				make_pair(root->inherited_type, std::vector<std::string>())));
+			available_functions.insert(
+				make_pair(root->children.at(0)->value, function_value));
 			local_names.insert(root->children.at(0)->value);
 		}
 		std::string current_type = "funkcija(void -> ";
