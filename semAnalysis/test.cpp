@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <iostream>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -16,7 +17,7 @@ class node {
 	std::string type = "undefined", inherited_type = "undefined", name,
 				return_type = "undefined";
 	bool lhs = false;
-	int row, depth, element_count;
+	int row, depth, element_count, input_row;
 	std::vector<std::string> arg_types, arg_names;
 	std::string symbol, value;
 	std::vector<node *> children;
@@ -35,6 +36,7 @@ class node {
 	}
 
 	int semantic_error(void) {
+		// std::cout << input_row << std::endl;
 		std::cout << symbol << " ::=";
 		for (node *current : children) {
 			std::cout << ' ' << current->symbol;
@@ -53,7 +55,7 @@ int loop_depth = 0; // tracks the depth of the loop
 std::vector<std::string> current_function_argument_types;
 std::string current_function_return_type = "";
 std::unordered_set<std::string> defined_functions;
-std::unordered_multiset<std::string> declared_functions;
+std::multiset<std::string> declared_functions;
 std::unordered_map<std::string,
 				   std::pair<std::string, std::vector<std::string>>>
 	global_declared_functions;
@@ -239,6 +241,7 @@ int primarni_izraz(node *root) {
 			int deepest_block = 0;
 			std::string current_type = "";
 			bool has_arguments = false;
+			std::vector<std::string> arguments;
 			for (auto it = range.first; it != range.second;
 				 it = std::next(it)) {
 				if (it->second.first > deepest_block) {
@@ -246,12 +249,14 @@ int primarni_izraz(node *root) {
 					current_type = it->second.second.first;
 					if (it->second.second.second.size() > 0) {
 						has_arguments = true;
+						arguments = it->second.second.second;
 					}
 				}
 			}
 			root->type = "funkcija(";
 			if (has_arguments) {
 				root->type += "params -> ";
+				root->arg_types = arguments;
 			} else {
 				root->type += "void -> ";
 			}
@@ -1437,11 +1442,12 @@ int definicija_funkcije(node *root) {
 				if (defined_functions.count(root->children.at(1)->value)) {
 					return root->semantic_error();
 				} else {
-					std::vector<std::string> arguments(1, "void");
+					std::vector<std::string> arguments(0);
 					std::pair<std::string, std::vector<std::string>>
 						function_key =
 							make_pair(root->children.at(0)->type, arguments);
-					if (declared_functions.count(root->children.at(1)->value) &&
+					if (global_declared_functions.count(
+							root->children.at(1)->value) &&
 						global_declared_functions.at(
 							root->children.at(1)->value) != function_key) {
 						return root->semantic_error();
@@ -1450,10 +1456,14 @@ int definicija_funkcije(node *root) {
 						if (declared_functions.count(
 								root->children.at(1)->value)) {
 							declared_functions.erase(
-								root->children.at(1)->value);
+								declared_functions.lower_bound(
+									root->children.at(1)->value));
 						}
 
 						// currenly in function
+						available_functions.insert(
+							make_pair(root->children.at(1)->value,
+									  make_pair(block_count, function_key)));
 						current_function_return_type =
 							root->children.at(0)->type;
 						current_function_argument_types = arguments;
@@ -1489,50 +1499,77 @@ int definicija_funkcije(node *root) {
 		// 6. zabiljezi definiciju i deklaraciju funkcije
 		// 7. provjeri(<slozena_naredba>) uz parametre funkcije koristeci
 		// <lista_parametara>.tipovi i <lista_parametara>.imena.
-		ime_tipa(root->children.at(0));
-		if (is_const(root->children.at(0)->type)) {
-			return root->semantic_error();
+		if (ime_tipa(root->children.at(0))) {
+			return 1;
 		} else {
-			if (defined_functions.count(root->children.at(1)->value)) {
+			if (is_const(root->children.at(0)->type)) {
 				return root->semantic_error();
 			} else {
-				lista_parametara(root->children.at(3));
-				std::vector<std::string> arguments =
-					root->children.at(3)->arg_types;
-				std::pair<std::string, std::vector<std::string>> function_key =
-					make_pair(root->children.at(0)->type, arguments);
-				if (declared_functions.count(root->children.at(1)->value) &&
-					global_declared_functions.at(root->children.at(1)->value) !=
-						function_key) {
-					return (root->semantic_error());
+				if (defined_functions.count(root->children.at(1)->value)) {
+					return root->semantic_error();
 				} else {
-					defined_functions.insert(root->children.at(1)->value);
-					if (declared_functions.count(root->children.at(1)->value)) {
-						declared_functions.erase(root->children.at(1)->value);
+					if (lista_parametara(root->children.at(3))) {
+						return 1;
+					} else {
+						std::vector<std::string> arguments =
+							root->children.at(3)->arg_types;
+						std::pair<std::string, std::vector<std::string>>
+							function_key = make_pair(root->children.at(0)->type,
+													 arguments);
+						if (global_declared_functions.count(
+								root->children.at(1)->value) &&
+							global_declared_functions.at(
+								root->children.at(1)->value) != function_key) {
+							return root->semantic_error();
+						} else {
+							defined_functions.insert(
+								root->children.at(1)->value);
+							if (declared_functions.count(
+									root->children.at(1)->value)) {
+								declared_functions.erase(
+									declared_functions.lower_bound(
+										root->children.at(1)->value));
+							}
+							// save parametars of previous function
+							// actually doesn't exist only is special gnu c
+							// compiler extension std::string
+							// previous_function_type =
+							// 	current_function_return_type;
+							// std::vector<std::string>
+							// previous_function_argument_types =
+							// current_function_argument_types; currenly in new
+							// function
+							available_functions.insert(make_pair(
+								root->children.at(1)->value,
+								make_pair(block_count, function_key)));
+							current_function_return_type =
+								root->children.at(0)->type;
+							current_function_argument_types = arguments;
+
+							for (size_t i = 0;
+								 i < root->children.at(3)->arg_types.size();
+								 ++i) {
+								available_variables.insert(make_pair(
+									root->children.at(3)->arg_names.at(i),
+									make_pair(block_count + 1,
+											  root->children.at(3)
+												  ->arg_types.at(i))));
+							}
+
+							if (slozena_naredba(root->children.at(5))) {
+								return 1;
+							} else {
+								// reset
+								// doesn't exist only is special gnu c compiler
+								// extension current_function_return_type =
+								// previous_function_type;
+								// current_function_argument_types =
+								// 	previous_function_argument_types;
+								current_function_return_type.clear();
+								current_function_argument_types.clear();
+							}
+						}
 					}
-					// save parametars of previous function
-					// actually doesn't exist only is special gnu c compiler
-					// extension
-					// std::string previous_function_type =
-					// 	current_function_return_type;
-					// std::vector<std::string>
-					// previous_function_argument_types =
-					// current_function_argument_types; currenly in new
-					// function
-					current_function_return_type = root->children.at(0)->type;
-					current_function_argument_types = arguments;
-
-					// zavrsiti 7.korak
-					slozena_naredba(root->children.at(3));
-
-					// reset
-					// doesn't exist only is special gnu c compiler
-					// extension current_function_return_type =
-					// previous_function_type;
-					// current_function_argument_types =
-					// 	previous_function_argument_types;
-					current_function_return_type.clear();
-					current_function_argument_types.clear();
 				}
 			}
 		}
@@ -1546,20 +1583,24 @@ int lista_parametara(node *root) {
 	// 	<lista_parametara> ::= <deklaracija_parametra>
 	// tipovi ← [<deklaracija_parametra>.tip ]
 	// imena ← [ <deklaracija_parametra>.ime ]
-	if (root->children.size() == 1) {
+	if (root->children.size() == 1 &&
+		root->children.at(0)->symbol == "<deklaracija_parametra>") {
 		// 1. provjeri(<deklaracija_parametra>)
 		if (deklaracija_parametra(root->children.at(0))) {
 			return 1;
 		} else {
-			root->arg_types = root->children.at(0)->arg_types;
-			root->arg_names = root->children.at(0)->arg_names;
+			root->arg_types.push_back(root->children.at(0)->type);
+			root->arg_names.push_back(root->children.at(0)->name);
 		}
 	}
 	// <lista_parametara> ::= <lista_parametara> ZAREZ
-	// <deklaracija_parametra> tipovi ← <lista_parametara>.tipovi + [
-	// <deklaracija_parametra>.tip ] imena ← <lista_parametara>.imena + [
-	// <deklaracija_parametra>.ime ]
-	else if (root->children.size() == 3) {
+	// <deklaracija_parametra>
+	// tipovi ← <lista_parametara>.tipovi + [<deklaracija_parametra>.tip ]
+	// imena ← <lista_parametara>.imena + [ <deklaracija_parametra>.ime ]
+	else if (root->children.size() == 3 &&
+			 root->children.at(1)->symbol == "ZAREZ" &&
+			 root->children.at(0)->symbol == "<lista_parametara>" &&
+			 root->children.at(2)->symbol == "<deklaracija_parametra>") {
 		// 1. provjeri(<lista_parametara>)
 		// 2. provjeri(<deklaracija_parametra>)
 		// 3. <deklaracija_parametra>.ime ne postoji u
@@ -1592,11 +1633,12 @@ int deklaracija_parametra(node *root) {
 	// <deklaracija_parametra> ::= <ime_tipa> IDN
 	// tip ← <ime_tipa>.tip
 	// ime ← IDN.ime
-	if (root->children.size() == 2) {
+	if (root->children.size() == 2 &&
+		root->children.at(0)->symbol == "<ime_tipa>" &&
+		root->children.at(1)->symbol == "IDN") {
 		// 1. provjeri(<ime_tipa>)
 		// 2. <ime_tipa>.tip ̸= void
-		ime_tipa(root->children.at(0));
-		if (0) {
+		if (ime_tipa(root->children.at(0))) {
 			return 1;
 		}
 		if (root->children.at(0)->type == "void") {
@@ -1611,8 +1653,7 @@ int deklaracija_parametra(node *root) {
 	else if (root->children.size() == 4) {
 		// 1. provjeri(<ime_tipa>)
 		// 2. <ime_tipa>.tip ̸= void
-		ime_tipa(root->children.at(0));
-		if (0) {
+		if (ime_tipa(root->children.at(0))) {
 			return 1;
 		}
 		if (root->children.at(0)->type == "void") {
@@ -2029,8 +2070,9 @@ int lista_izraza_pridruzivanja(node *root) {
 
 int main(void) {
 	std::string line;
-
+	int input_row = 0;
 	while (std::getline(std::cin, line)) {
+		++input_row;
 		int current_depth = 0, current_row = -1;
 		std::string current_symbol, current_value;
 		// depth of current node
@@ -2050,6 +2092,7 @@ int main(void) {
 		}
 		node *current_node =
 			new node(current_symbol, current_row, current_value, current_depth);
+		current_node->input_row = input_row;
 		if (all_nodes.empty()) {
 			all_nodes.push_back(current_node);
 			continue;
