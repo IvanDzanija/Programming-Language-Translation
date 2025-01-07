@@ -1,7 +1,5 @@
 #include <algorithm>
 #include <iostream>
-#include <map>
-#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -12,7 +10,7 @@
 // staviti potpune if i else uvjete
 // helper structures;
 
-void debug() { std::cout << "tu" << std::endl; }
+void debug() { std::cout << "I'm here" << std::endl; }
 class node {
   public:
 	std::string type = "undefined", inherited_type = "undefined", name;
@@ -96,7 +94,7 @@ bool implicit_conversion(std::string t1, std::string t2) {
 		return true;
 	} else if (t1 == "const(int)" && t2 == "int") {
 		return true;
-	} else if (t1 == "char " &&
+	} else if (t1 == "char" &&
 			   (t2 == "const(char)" || t2 == "int" || t2 == "const(int)")) {
 		return true;
 	} else if (t1 == "const(char)" &&
@@ -212,7 +210,6 @@ int primarni_izraz(node *root) {
 	// l-izraz ← IDN.l-izraz
 	if (root->children.at(0)->symbol == "IDN" && root->children.size() == 1) {
 		// 1. IDN.ime je deklarirano
-
 		// check if its a variable
 		if (available_variables.count(root->children.at(0)->value)) {
 			auto range =
@@ -226,6 +223,7 @@ int primarni_izraz(node *root) {
 					current_type = it->second.second;
 				}
 			}
+			root->type = current_type;
 			if (is_const(current_type)) {
 				root->lhs = false;
 			} else {
@@ -245,6 +243,7 @@ int primarni_izraz(node *root) {
 					current_type = it->second.second.first;
 				}
 			}
+			root->type = current_type;
 			root->lhs = false;
 		}
 		// check if its an array
@@ -260,6 +259,7 @@ int primarni_izraz(node *root) {
 					current_type = it->second.second.first;
 				}
 			}
+			root->type = current_type;
 			root->lhs = false;
 		} else {
 			return root->semantic_error();
@@ -480,7 +480,6 @@ int lista_argumenata(node *root) {
 	return 0;
 }
 
-// FINISHED
 int unarni_izraz(node *root) {
 	// 	<unarni_izraz> ::= <postfiks_izraz>
 	// tip ← <postfiks_izraz>.tip
@@ -623,10 +622,10 @@ int specifikator_tipa(node *root) {
 		else if (root->children.at(0)->symbol == "KR_INT") {
 			root->type = "int";
 		} else {
-			root->semantic_error();
+			return root->semantic_error();
 		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -678,9 +677,12 @@ int aditivni_izraz(node *root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<multiplikativni_izraz>") {
 		// 1. provjeri(<multiplikativni_izraz>)
-		multiplikativni_izraz(root->children.at(0));
-		root->type = root->children.at(0)->type;
-		root->lhs = root->children.at(0)->lhs;
+		if (multiplikativni_izraz(root->children.at(0))) {
+			return 1;
+		} else {
+			root->type = root->children.at(0)->type;
+			root->lhs = root->children.at(0)->lhs;
+		}
 	}
 	// <aditivni_izraz> ::= <aditivni_izraz> (PLUS | MINUS)
 	// <multiplikativni_izraz>
@@ -693,18 +695,27 @@ int aditivni_izraz(node *root) {
 		// 2. <aditivni_izraz>.tip ∼ int
 		// 3. provjeri(<multiplikativni_izraz>)
 		// 4. <multiplikativni_izraz>.tip ∼ int
-		aditivni_izraz(root->children.at(0));
-		if (!implicit_conversion(root->children.at(0)->type, "int")) {
-			root->semantic_error();
+
+		if (aditivni_izraz(root->children.at(0))) {
+			return 1;
 		} else {
-			multiplikativni_izraz(root->children.at(2));
-			if (!implicit_conversion(root->children.at(2)->type, "int")) {
-				root->semantic_error();
+			if (!implicit_conversion(root->children.at(0)->type, "int")) {
+				return root->semantic_error();
 			} else {
-				root->type = "int";
-				root->lhs = false;
+				if (multiplikativni_izraz(root->children.at(2))) {
+					return 1;
+				} else {
+					if (!implicit_conversion(root->children.at(2)->type,
+											 "int")) {
+						return root->semantic_error();
+					} else {
+						root->type = "int";
+						root->lhs = false;
+					}
+				}
 			}
 		}
+
 	} else {
 		root->semantic_error();
 	}
@@ -1611,12 +1622,13 @@ int deklaracija(node *root) {
 		// 1. provjeri(<ime_tipa>)
 		// 2. provjeri(<lista_init_deklaratora>) uz nasljedno svojstvo
 		// <lista_init_deklaratora>.ntip ← <ime_tipa>.tip
-		ime_tipa(root->children.at(0));
-		if (0) {
+		if (ime_tipa(root->children.at(0))) {
 			return 1;
 		} else {
 			root->children.at(1)->inherited_type = root->children.at(0)->type;
-			lista_init_deklaratora(root->children.at(1));
+			if (lista_init_deklaratora(root->children.at(1))) {
+				return 1;
+			}
 		}
 	} else {
 		return root->semantic_error();
@@ -1839,12 +1851,13 @@ int izravni_deklarator(node *root) {
 		if (lista_parametara(root->children.at(2))) {
 			return 1;
 		} else {
+			std::pair<int, std::pair<std::string, std::vector<std::string>>>
+				function_value = make_pair(
+					block_count, make_pair(root->inherited_type,
+										   root->children.at(2)->arg_types));
 			if (local_names.count(root->children.at(0)->value)) {
-				std::pair<std::string, std::vector<std::string>>
-					function_value = make_pair(root->inherited_type,
-											   root->children.at(2)->arg_types);
-				if (declared_functions.count(root->children.at(0)->value)) {
-					if (declared_functions.at(root->children.at(0)->value) !=
+				if (available_functions.count(root->children.at(0)->value)) {
+					if (available_functions.at(root->children.at(0)->value) !=
 						function_value) {
 						return root->semantic_error();
 					}
@@ -1852,10 +1865,8 @@ int izravni_deklarator(node *root) {
 					return root->semantic_error();
 				}
 			} else {
-				declared_functions.insert(
-					make_pair(root->children.at(0)->value,
-							  make_pair(root->inherited_type,
-										root->children.at(2)->arg_types)));
+				available_functions.insert(
+					make_pair(root->children.at(0)->value, function_value));
 				local_names.insert(root->children.at(0)->value);
 			}
 			// std::string current_type = "funkcija(";
