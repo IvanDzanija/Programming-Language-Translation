@@ -148,7 +148,8 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 	// <primarni_izraz> ::= NIZ_ZNAKOVA
 	// tip ← niz(const(char))
 	// l-izraz ← 0
-	else if (root->children.at(0)->symbol == "NIZ_ZNAKOVA") {
+	else if (root->children.size() == 1 &&
+			 root->children.at(0)->symbol == "NIZ_ZNAKOVA") {
 		// 1. konstantni niz znakova je ispravan po 4.3.2
 		if (root->children.at(0)->value.at(0) != '"' ||
 			root->children.at(0)->value.at(root->children.at(0)->value.size() -
@@ -330,20 +331,31 @@ int lista_argumenata(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<izraz_pridruzivanja>") {
 		// 1. provjeri(<izraz_pridruzivanja>)
-		izraz_pridruzivanja(root->children.at(0));
-		root->arg_types.push_back(root->children.at(0)->type);
+		if (izraz_pridruzivanja(root->children.at(0))) {
+			return 1;
+		} else {
+			root->arg_types.push_back(root->children.at(0)->type);
+		}
 	}
 	// <lista_argumenata> ::= <lista_argumenata> ZAREZ <izraz_pridruzivanja>
 	// tipovi ← <lista_argumenata>.tipovi + [ <izraz_pridruzivanja>.tip ]
-	else if (root->children.size() == 3) {
+	else if (root->children.size() == 3 &&
+			 root->children.at(0)->symbol == "<lista_argumenata>" &&
+			 root->children.at(1)->symbol == "ZAREZ" &&
+			 root->children.at(2)->symbol == "<izraz_pridruzivanja>") {
 		// 1. provjeri(<lista_argumenata>)
 		// 2. provjeri(<izraz_pridruzivanja>)
-		lista_argumenata(root->children.at(0));
-		izraz_pridruzivanja(root->children.at(2));
-		root->arg_types = root->children.at(0)->arg_types;
-		root->arg_types.push_back(root->children.at(2)->type);
+		if (lista_argumenata(root->children.at(0))) {
+			return 1;
+		} else if (izraz_pridruzivanja(root->children.at(2))) {
+			return 1;
+		} else {
+			root->arg_types = root->children.at(0)->arg_types;
+			root->arg_types.push_back(root->children.at(2)->type);
+		}
+
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -418,28 +430,39 @@ int cast_izraz(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<unarni_izraz>") {
 		// 1. provjeri(<unarni_izraz>)
-		unarni_izraz(root->children.at(0));
-		root->type = root->children.at(0)->type;
-		root->lhs = root->children.at(0)->lhs;
+		if (unarni_izraz(root->children.at(0))) {
+			return 1;
+		} else {
+			root->type = root->children.at(0)->type;
+			root->lhs = root->children.at(0)->lhs;
+		}
 	}
 	// <cast_izraz> ::= L_ZAGRADA <ime_tipa> D_ZAGRADA <cast_izraz>
 	// tip ← <ime_tipa>.tip
 	// l-izraz ← 0
-	else if (root->children.size() == 4) {
+	else if (root->children.size() == 4 &&
+			 root->children.at(0)->symbol == "L_ZAGRADA" &&
+			 root->children.at(2)->symbol == "D_ZAGRADA" &&
+			 root->children.at(1)->symbol == "<ime_tipa>" &&
+			 root->children.at(3)->symbol == "<cast_izraz>") {
 		// 1. provjeri(<ime_tipa>)
 		// 2. provjeri(<cast_izraz>)
 		// 3. <cast_izraz>.tip se moze pretvoriti u <ime_tipa>.tip
-		ime_tipa(root->children.at(1));
-		cast_izraz(root->children.at(3));
-		if (!explicit_conversion(root->children.at(3)->type,
-								 root->children.at(1)->type)) {
-			root->semantic_error();
+		if (ime_tipa(root->children.at(1))) {
+			return 1;
+		} else if (cast_izraz(root->children.at(3))) {
+			return 1;
 		} else {
-			root->type = root->children.at(1)->type;
-			root->lhs = false;
+			if (!explicit_conversion(root->children.at(3)->type,
+									 root->children.at(1)->type)) {
+				return root->semantic_error();
+			} else {
+				root->type = root->children.at(1)->type;
+				root->lhs = false;
+			}
 		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -450,25 +473,34 @@ int ime_tipa(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<specifikator_tipa>") {
 		// 1. provjeri(<specifikator_tipa>)
-		specifikator_tipa(root->children.at(0));
-		root->type = root->children.at(0)->type;
+		if (specifikator_tipa(root->children.at(0))) {
+			return 1;
+		} else {
+			root->type = root->children.at(0)->type;
+		}
 	}
 	// <ime_tipa> ::= KR_CONST <specifikator_tipa>
 	//  tip ← const(<specifikator_tipa>.tip)
-	else if (root->children.size() == 2) {
+	else if (root->children.size() == 2 &&
+			 root->children.at(0)->symbol == "KR_CONST" &&
+			 root->children.at(1)->symbol == "<specifikator_tipa>") {
 		// 1. provjeri(<specifikator_tipa>)
 		// 2. <specifikator_tipa>.tip != void
-		specifikator_tipa(root->children.at(1));
-		if (root->children.at(1)->type == "void") {
-			root->semantic_error();
+		if (specifikator_tipa(root->children.at(1))) {
+			return 1;
 		} else {
-			std::string X = "const(";
-			X += root->children.at(1)->type;
-			X += ')';
-			root->type = X;
+			if (root->children.at(1)->type == "void") {
+				return root->semantic_error();
+			} else {
+				std::string X = "const(";
+				X += root->children.at(1)->type;
+				X += ')';
+				root->type = X;
+			}
 		}
+
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -505,35 +537,44 @@ int multiplikativni_izraz(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<cast_izraz>") {
 		// 1. provjeri(<cast_izraz>)
-		cast_izraz(root->children.at(0));
-		root->type = root->children.at(0)->type;
-		root->lhs = root->children.at(0)->lhs;
+		if (cast_izraz(root->children.at(0))) {
+			return 1;
+		} else {
+			root->type = root->children.at(0)->type;
+			root->lhs = root->children.at(0)->lhs;
+		}
 	}
 	// <multiplikativni_izraz> ::= <multiplikativni_izraz> (OP_PUTA |
-	// OP_DIJELI | OP_MOD) <cast_izraz> tip ← int l-izraz ← 0
+	// OP_DIJELI | OP_MOD) <cast_izraz>
+	// tip ← int
+	// l-izraz ← 0
 	else if (root->children.size() == 3 &&
 			 (root->children.at(1)->symbol == "OP_PUTA" ||
 			  root->children.at(1)->symbol == "OP_DIJELI" ||
-			  root->children.at(1)->symbol == "OP_MOD")) {
+			  root->children.at(1)->symbol == "OP_MOD") &&
+			 root->children.at(2)->symbol == "<cast_izraz>" &&
+			 root->children.at(0)->symbol == "<multiplikativni_izraz>") {
 		// 1. provjeri(<multiplikativni_izraz>)
 		// 2. <multiplikativni_izraz>.tip ∼ int
 		// 3. provjeri(<cast_izraz>)
 		// 4. <cast_izraz>.tip ∼ int
-		multiplikativni_izraz(root->children.at(0));
-		if (!implicit_conversion(root->children.at(0)->type, "int")) {
-			root->semantic_error();
+		if (multiplikativni_izraz(root->children.at(0))) {
+			return 1;
+		} else if (!implicit_conversion(root->children.at(0)->type, "int")) {
+			return root->semantic_error();
 		} else {
-			cast_izraz(root->children.at(2));
-			if (!implicit_conversion(root->children.at(2)->type, "int")) {
-				root->semantic_error();
+			if (cast_izraz(root->children.at(2))) {
+				return 1;
+			} else if (!implicit_conversion(root->children.at(2)->type,
+											"int")) {
+				return root->semantic_error();
 			} else {
 				root->type = "int";
 				root->lhs = false;
 			}
 		}
-
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -557,13 +598,14 @@ int aditivni_izraz(std::shared_ptr<Node> root) {
 	// tip ← int
 	// l-izraz ← 0
 	else if (root->children.size() == 3 &&
+			 root->children.at(0)->symbol == "<aditivni_izraz>" &&
+			 root->children.at(2)->symbol == "<multiplikativni_izraz>" &&
 			 (root->children.at(1)->symbol == "PLUS" ||
 			  root->children.at(1)->symbol == "MINUS")) {
 		// 1. provjeri(<aditivni_izraz>)
 		// 2. <aditivni_izraz>.tip ∼ int
 		// 3. provjeri(<multiplikativni_izraz>)
 		// 4. <multiplikativni_izraz>.tip ∼ int
-
 		if (aditivni_izraz(root->children.at(0))) {
 			return 1;
 		} else {
@@ -585,7 +627,7 @@ int aditivni_izraz(std::shared_ptr<Node> root) {
 		}
 
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -597,15 +639,20 @@ int odnosni_izraz(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<aditivni_izraz>") {
 		// 1. provjeri(<aditivni_izraz>)
-		aditivni_izraz(root->children.at(0));
-		root->type = root->children.at(0)->type;
-		root->lhs = root->children.at(0)->lhs;
+		if (aditivni_izraz(root->children.at(0))) {
+			return 1;
+		} else {
+			root->type = root->children.at(0)->type;
+			root->lhs = root->children.at(0)->lhs;
+		}
 	}
 	// <odnosni_izraz> ::= <odnosni_izraz> (OP_LT | OP_GT | OP_LTE | OP_GTE)
 	// <aditivni_izraz>
 	// tip ← int
 	// l-izraz ← 0
 	else if (root->children.size() == 3 &&
+			 root->children.at(0)->symbol == "<odnosni_izraz>" &&
+			 root->children.at(2)->symbol == "<aditivni_izraz>" &&
 			 (root->children.at(1)->symbol == "OP_LT" ||
 			  root->children.at(1)->symbol == "OP_GT" ||
 			  root->children.at(1)->symbol == "OP_LTE" ||
@@ -614,20 +661,23 @@ int odnosni_izraz(std::shared_ptr<Node> root) {
 		// 2. <odnosni_izraz>.tip ∼ int
 		// 3. provjeri(<aditivni_izraz>)
 		// 4. <aditivni_izraz>.tip ∼ int
-		odnosni_izraz(root->children.at(0));
-		if (!implicit_conversion(root->children.at(0)->type, "int")) {
-			root->semantic_error();
+		if (odnosni_izraz(root->children.at(0))) {
+			return 1;
+		} else if (!implicit_conversion(root->children.at(0)->type, "int")) {
+			return root->semantic_error();
 		} else {
-			aditivni_izraz(root->children.at(2));
-			if (!implicit_conversion(root->children.at(2)->type, "int")) {
-				root->semantic_error();
+			if (aditivni_izraz(root->children.at(2))) {
+				return 1;
+			} else if (!implicit_conversion(root->children.at(2)->type,
+											"int")) {
+				return root->semantic_error();
 			} else {
 				root->type = "int";
 				root->lhs = false;
 			}
 		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -639,35 +689,43 @@ int jednakosni_izraz(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<odnosni_izraz>") {
 		// 1. provjeri(<odnosni_izraz>)
-		odnosni_izraz(root->children.at(0));
-		root->type = root->children.at(0)->type;
-		root->lhs = root->children.at(0)->lhs;
+		if (odnosni_izraz(root->children.at(0))) {
+			return 1;
+		} else {
+			root->type = root->children.at(0)->type;
+			root->lhs = root->children.at(0)->lhs;
+		}
 	}
 	// <jednakosni_izraz> ::= <jednakosni_izraz> (OP_EQ | OP_NEQ)
 	// <odnosni_izraz>
 	// tip ← int
 	// l-izraz ← 0
 	else if (root->children.size() == 3 &&
+			 root->children.at(0)->symbol == "<jednakosni_izraz>" &&
+			 root->children.at(2)->symbol == "<odnosni_izraz>" &&
 			 (root->children.at(1)->symbol == "OP_EQ" ||
 			  root->children.at(1)->symbol == "OP_NEQ")) {
 		// 1. provjeri(<jednakosni_izraz>)
 		// 2. <jednakosni_izraz>.tip ∼ int
 		// 3. provjeri(<odnosni_izraz>)
 		// 4. <odnosni_izraz>.tip ∼ int
-		jednakosni_izraz(root->children.at(0));
-		if (!implicit_conversion(root->children.at(0)->type, "int")) {
-			root->semantic_error();
+		if (jednakosni_izraz(root->children.at(0))) {
+			return 1;
+		} else if (!implicit_conversion(root->children.at(0)->type, "int")) {
+			return root->semantic_error();
 		} else {
-			odnosni_izraz(root->children.at(2));
-			if (!implicit_conversion(root->children.at(2)->type, "int")) {
-				root->semantic_error();
+			if (odnosni_izraz(root->children.at(2))) {
+				return 1;
+			} else if (!implicit_conversion(root->children.at(2)->type,
+											"int")) {
+				return root->semantic_error();
 			} else {
 				root->type = "int";
 				root->lhs = false;
 			}
 		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -679,33 +737,41 @@ int bin_i_izraz(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<jednakosni_izraz>") {
 		// 1. provjeri(<jednakosni_izraz>)
-		jednakosni_izraz(root->children.at(0));
-		root->type = root->children.at(0)->type;
-		root->lhs = root->children.at(0)->lhs;
+		if (jednakosni_izraz(root->children.at(0))) {
+			return 1;
+		} else {
+			root->type = root->children.at(0)->type;
+			root->lhs = root->children.at(0)->lhs;
+		}
 	}
 	// <bin_i_izraz> ::= <bin_i_izraz> OP_BIN_I <jednakosni_izraz>
 	// tip ← int
 	// l-izraz ← 0
 	else if (root->children.size() == 3 &&
+			 root->children.at(0)->symbol == "<bin_i_izraz>" &&
+			 root->children.at(2)->symbol == "<jednakosni_izraz>" &&
 			 root->children.at(1)->symbol == "OP_BIN_I") {
 		// 1. provjeri(<bin_i_izraz>)
 		// 2. <bin_i_izraz>.tip ∼ int
 		// 3. provjeri(<jednakosni_izraz>)
 		// 4. <jednakosni_izraz>.tip ∼ int
-		bin_i_izraz(root->children.at(0));
-		if (!implicit_conversion(root->children.at(0)->type, "int")) {
-			root->semantic_error();
+		if (bin_i_izraz(root->children.at(0))) {
+			return 1;
+		} else if (!implicit_conversion(root->children.at(0)->type, "int")) {
+			return root->semantic_error();
 		} else {
-			jednakosni_izraz(root->children.at(2));
-			if (!implicit_conversion(root->children.at(2)->type, "int")) {
-				root->semantic_error();
+			if (jednakosni_izraz(root->children.at(2))) {
+				return 1;
+			} else if (!implicit_conversion(root->children.at(2)->type,
+											"int")) {
+				return root->semantic_error();
 			} else {
 				root->type = "int";
 				root->lhs = false;
 			}
 		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -717,32 +783,41 @@ int bin_xili_izraz(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<bin_i_izraz>") {
 		// 1. provjeri(<bin_i_izraz>)
-		bin_i_izraz(root->children.at(0));
-		root->type = root->children.at(0)->type;
-		root->lhs = root->children.at(0)->lhs;
+		if (bin_i_izraz(root->children.at(0))) {
+			return 1;
+		} else {
+			root->type = root->children.at(0)->type;
+			root->lhs = root->children.at(0)->lhs;
+		}
 	}
 	// 	<bin_xili_izraz> ::= <bin_xili_izraz> OP_BIN_XILI <bin_i_izraz>
 	// tip ← int
 	// l-izraz ← 0
-	else if (root->children.size() == 3) {
+	else if (root->children.size() == 3 &&
+			 root->children.at(0)->symbol == "<bin_xili_izraz>" &&
+			 root->children.at(1)->symbol == "OP_BIN_XILI" &&
+			 root->children.at(2)->symbol == "<bin_i_izraz>") {
 		// 1. provjeri(<bin_xili_izraz>)
 		// 2. <bin_xili_izraz>.tip ∼ int
 		// 3. provjeri(<bin_i_izraz>)
 		// 4. <bin_i_izraz>.tip ∼ int
-		bin_xili_izraz(root->children.at(0));
-		if (!implicit_conversion(root->children.at(0)->type, "int")) {
-			root->semantic_error();
+		if (bin_xili_izraz(root->children.at(0))) {
+			return 1;
+		} else if (!implicit_conversion(root->children.at(0)->type, "int")) {
+			return root->semantic_error();
 		} else {
-			bin_i_izraz(root->children.at(2));
-			if (!implicit_conversion(root->children.at(2)->type, "int")) {
-				root->semantic_error();
+			if (bin_i_izraz(root->children.at(2))) {
+				return 1;
+			} else if (!implicit_conversion(root->children.at(2)->type,
+											"int")) {
+				return root->semantic_error();
 			} else {
 				root->type = "int";
 				root->lhs = false;
 			}
 		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -754,33 +829,41 @@ int bin_ili_izraz(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<bin_xili_izraz>") {
 		// 1. provjeri(<bin_xili_izraz>)
-		bin_xili_izraz(root->children.at(0));
-		root->type = root->children.at(0)->type;
-		root->lhs = root->children.at(0)->lhs;
+		if (bin_xili_izraz(root->children.at(0))) {
+			return 1;
+		} else {
+			root->type = root->children.at(0)->type;
+			root->lhs = root->children.at(0)->lhs;
+		}
 	}
 	// <bin_ili_izraz> ::= <bin_ili_izraz> OP_BIN_ILI <bin_xili_izraz>
 	// tip ← int
 	// l-izraz ← 0
 	else if (root->children.size() == 3 &&
+			 root->children.at(0)->symbol == "<bin_ili_izraz>" &&
+			 root->children.at(2)->symbol == "<bin_xili_izraz>" &&
 			 root->children.at(1)->symbol == "OP_BIN_ILI") {
 		// 1. provjeri(<bin_ili_izraz>)
 		// 2. <bin_ili_izraz >.tip ∼ int
 		// 3. provjeri(<bin_xili_izraz>)
 		// 4. <bin_xili_izraz >.tip ∼ int
-		bin_ili_izraz(root->children.at(0));
-		if (!implicit_conversion(root->children.at(0)->type, "int")) {
-			root->semantic_error();
+		if (bin_ili_izraz(root->children.at(0))) {
+			return 1;
+		} else if (!implicit_conversion(root->children.at(0)->type, "int")) {
+			return root->semantic_error();
 		} else {
-			bin_xili_izraz(root->children.at(2));
-			if (!implicit_conversion(root->children.at(2)->type, "int")) {
-				root->semantic_error();
+			if (bin_xili_izraz(root->children.at(2))) {
+				return 1;
+			} else if (!implicit_conversion(root->children.at(2)->type,
+											"int")) {
+				return root->semantic_error();
 			} else {
 				root->type = "int";
 				root->lhs = false;
 			}
 		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -792,33 +875,41 @@ int log_i_izraz(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<bin_ili_izraz>") {
 		// 1. provjeri(<bin_ili_izraz>)
-		bin_ili_izraz(root->children.at(0));
-		root->type = root->children.at(0)->type;
-		root->lhs = root->children.at(0)->lhs;
+		if (bin_ili_izraz(root->children.at(0))) {
+			return 1;
+		} else {
+			root->type = root->children.at(0)->type;
+			root->lhs = root->children.at(0)->lhs;
+		}
 	}
 	// <log_i_izraz> ::= <log_i_izraz> OP_I <bin_ili_izraz>
 	// tip ← int
 	// l-izraz ← 0
 	else if (root->children.size() == 3 &&
+			 root->children.at(0)->symbol == "<log_i_izraz>" &&
+			 root->children.at(2)->symbol == "<bin_ili_izraz>" &&
 			 root->children.at(1)->symbol == "OP_I") {
 		// 1. provjeri(<log_i_izraz>)
 		// 2. <log_i_izraz>.tip ∼ int
 		// 3. provjeri(<bin_ili_izraz>)
 		// 4. <bin_ili_izraz>.tip ∼ int
-		log_i_izraz(root->children.at(0));
-		if (!implicit_conversion(root->children.at(0)->type, "int")) {
-			root->semantic_error();
+		if (log_i_izraz(root->children.at(0))) {
+			return 1;
+		} else if (!implicit_conversion(root->children.at(0)->type, "int")) {
+			return root->semantic_error();
 		} else {
-			bin_ili_izraz(root->children.at(2));
-			if (!implicit_conversion(root->children.at(2)->type, "int")) {
-				root->semantic_error();
+			if (bin_ili_izraz(root->children.at(2))) {
+				return 1;
+			} else if (!implicit_conversion(root->children.at(2)->type,
+											"int")) {
+				return root->semantic_error();
 			} else {
 				root->type = "int";
 				root->lhs = false;
 			}
 		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -830,25 +921,33 @@ int log_ili_izraz(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<log_i_izraz>") {
 		// 1. provjeri(<log_i_izraz>)
-		log_i_izraz(root->children.at(0));
-		root->type = root->children.at(0)->type;
-		root->lhs = root->children.at(0)->lhs;
+		if (log_i_izraz(root->children.at(0))) {
+			return 1;
+		} else {
+			root->type = root->children.at(0)->type;
+			root->lhs = root->children.at(0)->lhs;
+		}
 	}
 	// <log_ili_izraz> ::= <log_ili_izraz> OP_ILI <log_i_izraz>
 	// tip ← int
 	// l-izraz ← 0
 	else if (root->children.size() == 3 &&
+			 root->children.at(0)->symbol == "<log_ili_izraz>" &&
+			 root->children.at(2)->symbol == "<log_i_izraz>" &&
 			 root->children.at(1)->symbol == "OP_ILI") {
 		// 1. provjeri(<log_ili_izraz>)
 		// 2. <log_ili_izraz>.tip ∼ int
 		// 3. provjeri(<log_i_izraz>)
 		// 4. <log_i_izraz>.tip ∼ int
-		log_ili_izraz(root->children.at(0));
-		if (!implicit_conversion(root->children.at(0)->type, "int")) {
-			root->semantic_error();
+		if (log_ili_izraz(root->children.at(0))) {
+			return 1;
+		} else if (!implicit_conversion(root->children.at(0)->type, "int")) {
+			return root->semantic_error();
 		} else {
-			log_i_izraz(root->children.at(2));
-			if (!implicit_conversion(root->children.at(2)->type, "int")) {
+			if (log_i_izraz(root->children.at(2))) {
+				return 1;
+			} else if (!implicit_conversion(root->children.at(2)->type,
+											"int")) {
 				return root->semantic_error();
 			} else {
 				root->type = "int";
@@ -1037,7 +1136,9 @@ int lista_naredbi(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<naredba>") {
 		// 1. provjeri(<naredba>)
-		naredba(root->children.at(0));
+		if (naredba(root->children.at(0))) {
+			return 1;
+		}
 	}
 	// <lista_naredbi> ::= <lista_naredbi> <naredba>
 	else if (root->children.size() == 2 &&
@@ -1045,10 +1146,13 @@ int lista_naredbi(std::shared_ptr<Node> root) {
 			 root->children.at(1)->symbol == "<naredba>") {
 		// 1. provjeri(<lista_naredbi>)
 		// 2. provjeri(<naredba>)
-		lista_naredbi(root->children.at(0));
-		naredba(root->children.at(1));
+		if (lista_naredbi(root->children.at(0))) {
+			return 1;
+		} else if (naredba(root->children.at(1))) {
+			return 1;
+		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -1062,20 +1166,30 @@ int naredba(std::shared_ptr<Node> root) {
 	// strane, produkcije ovdje nisu prikazane.
 	if (root->children.size() == 1) {
 		if (root->children.at(0)->symbol == "<slozena_naredba>") {
-			slozena_naredba(root->children.at(0));
+			if (slozena_naredba(root->children.at(0))) {
+				return 1;
+			}
 		} else if (root->children.at(0)->symbol == "<izraz_naredba>") {
-			izraz_naredba(root->children.at(0));
+			if (izraz_naredba(root->children.at(0))) {
+				return 1;
+			}
 		} else if (root->children.at(0)->symbol == "<naredba_grananja>") {
-			naredba_grananja(root->children.at(0));
+			if (naredba_grananja(root->children.at(0))) {
+				return 1;
+			}
 		} else if (root->children.at(0)->symbol == "<naredba_petlje>") {
-			naredba_petlje(root->children.at(0));
+			if (naredba_petlje(root->children.at(0))) {
+				return 1;
+			}
 		} else if (root->children.at(0)->symbol == "<naredba_skoka>") {
-			naredba_skoka(root->children.at(0));
+			if (naredba_skoka(root->children.at(0))) {
+				return 1;
+			}
 		} else {
-			root->semantic_error();
+			return root->semantic_error();
 		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -1106,33 +1220,51 @@ int izraz_naredba(std::shared_ptr<Node> root) {
 
 int naredba_grananja(std::shared_ptr<Node> root) {
 	// 	<naredba_grananja> ::= KR_IF L_ZAGRADA <izraz> D_ZAGRADA <naredba>
-	if (root->children.size() == 5) {
+	if (root->children.size() == 5 && root->children.at(0)->symbol == "KR_IF" &&
+		root->children.at(1)->symbol == "L_ZAGRADA" &&
+		root->children.at(2)->symbol == "<izraz>" &&
+		root->children.at(3)->symbol == "D_ZAGRADA" &&
+		root->children.at(4)->symbol == "<naredba>") {
 		// 1. provjeri(<izraz>)
 		// 2. <izraz>.tip ∼ int
 		// 3. provjeri(<naredba>)
-		izraz(root->children.at(2));
-		if (!implicit_conversion(root->children.at(2)->type, "int")) {
-			root->semantic_error();
+		if (izraz(root->children.at(2))) {
+			return 1;
+		} else if (!implicit_conversion(root->children.at(2)->type, "int")) {
+			return root->semantic_error();
 		} else {
-			naredba(root->children.at(4));
+			if (naredba(root->children.at(4))) {
+				return 1;
+			}
 		}
 	}
 	// <naredba_grananja> ::= KR_IF L_ZAGRADA <izraz> D_ZAGRADA <naredba>1
 	// KR_ELSE <naredba>2
-	else if (root->children.size() == 7) {
+	else if (root->children.size() == 7 &&
+			 root->children.at(0)->symbol == "KR_IF" &&
+			 root->children.at(1)->symbol == "L_ZAGRADA" &&
+			 root->children.at(2)->symbol == "<izraz>" &&
+			 root->children.at(3)->symbol == "D_ZAGRADA" &&
+			 root->children.at(4)->symbol == "<naredba>" &&
+			 root->children.at(5)->symbol == "KR_ELSE" &&
+			 root->children.at(6)->symbol == "<naredba>") {
 		// 1. provjeri(<izraz>)
 		// 2. <izraz>.tip ∼ int
 		// 3. provjeri(<naredba>1)
 		// 4. provjeri(<naredba>2)
-		izraz(root->children.at(2));
-		if (!implicit_conversion(root->children.at(2)->type, "int")) {
-			root->semantic_error();
+		if (izraz(root->children.at(2))) {
+			return 1;
+		} else if (!implicit_conversion(root->children.at(2)->type, "int")) {
+			return root->semantic_error();
 		} else {
-			naredba(root->children.at(4));
-			naredba(root->children.at(6));
+			if (naredba(root->children.at(4))) {
+				return 1;
+			} else if (naredba(root->children.at(6))) {
+				return 1;
+			}
 		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -1140,50 +1272,80 @@ int naredba_grananja(std::shared_ptr<Node> root) {
 int naredba_petlje(std::shared_ptr<Node> root) {
 	++loop_depth;
 	// <naredba_petlje> ::= KR_WHILE L_ZAGRADA <izraz> D_ZAGRADA <naredba>
-	if (root->children.size() == 5) {
+	if (root->children.size() == 5 &&
+		root->children.at(0)->symbol == "KR_WHILE" &&
+		root->children.at(1)->symbol == "L_ZAGRADA" &&
+		root->children.at(2)->symbol == "<izraz>" &&
+		root->children.at(3)->symbol == "D_ZAGRADA" &&
+		root->children.at(4)->symbol == "<naredba>") {
 		// 1. provjeri(<izraz>)
 		// 2. <izraz>.tip ∼ int
 		// 3. provjeri(<naredba>)
-		izraz(root->children.at(2));
-		if (!implicit_conversion(root->children.at(2)->type, "int")) {
-			root->semantic_error();
+		if (izraz(root->children.at(2))) {
+			return 1;
+		} else if (!implicit_conversion(root->children.at(2)->type, "int")) {
+			return root->semantic_error();
 		} else {
-			naredba(root->children.at(4));
+			if (naredba(root->children.at(4))) {
+				return 1;
+			}
 		}
 	}
 	// <naredba_petlje> ::= KR_FOR L_ZAGRADA <izraz_naredba>1
 	// <izraz_naredba>2 D_ZAGRADA <naredba>
-	else if (root->children.size() == 6) {
+	else if (root->children.size() == 6 &&
+			 root->children.at(0)->symbol == "KR_FOR" &&
+			 root->children.at(1)->symbol == "L_ZAGRADA" &&
+			 root->children.at(2)->symbol == "<izraz_naredba>" &&
+			 root->children.at(3)->symbol == "<izraz_naredba>" &&
+			 root->children.at(4)->symbol == "D_ZAGRADA" &&
+			 root->children.at(5)->symbol == "<naredba>") {
 		// 1. provjeri(<izraz_naredba>1)
 		// 2. provjeri(<izraz_naredba>2)
 		// 3.<izraz_naredba>2.tip ∼ int
 		// 4. provjeri(<naredba>)
-		izraz_naredba(root->children.at(2));
-		izraz_naredba(root->children.at(3));
-		if (!implicit_conversion(root->children.at(3)->type, "int")) {
-			root->semantic_error();
+		if (izraz_naredba(root->children.at(2))) {
+			return 1;
+		} else if (izraz_naredba(root->children.at(3))) {
+			return 1;
+		} else if (!implicit_conversion(root->children.at(3)->type, "int")) {
+			return root->semantic_error();
 		} else {
-			naredba(root->children.at(5));
+			if (naredba(root->children.at(5))) {
+				return 1;
+			}
 		}
 	}
 	// <naredba_petlje> ::= KR_FOR L_ZAGRADA <izraz_naredba>1
 	// <izraz_naredba>2 <izraz> D_ZAGRADA <naredba>
-	else if (root->children.size() == 7) {
+	else if (root->children.size() == 7 &&
+			 root->children.at(0)->symbol == "KR_FOR" &&
+			 root->children.at(1)->symbol == "L_ZAGRADA" &&
+			 root->children.at(2)->symbol == "<izraz_naredba>" &&
+			 root->children.at(3)->symbol == "<izraz_naredba>" &&
+			 root->children.at(4)->symbol == "<izraz>" &&
+			 root->children.at(5)->symbol == "D_ZAGRADA" &&
+			 root->children.at(6)->symbol == "<naredba>") {
 		// 1. provjeri(<izraz_naredba>1)
 		// 2. provjeri(<izraz_naredba>2)
 		// 3. <izraz_naredba>2.tip ∼ int
 		// 4. provjeri(<izraz>)
 		// 5. provjeri(<naredba>)
-		izraz_naredba(root->children.at(2));
-		izraz_naredba(root->children.at(3));
-		if (!implicit_conversion(root->children.at(3)->type, "int")) {
-			root->semantic_error();
+		if (izraz_naredba(root->children.at(2))) {
+			return 1;
+		} else if (izraz_naredba(root->children.at(3))) {
+			return 1;
+		} else if (!implicit_conversion(root->children.at(3)->type, "int")) {
+			return root->semantic_error();
 		} else {
-			izraz(root->children.at(4));
-			naredba(root->children.at(6));
+			if (izraz(root->children.at(4))) {
+				return 1;
+			} else if (naredba(root->children.at(6))) {
+				return 1;
+			}
 		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	--loop_depth;
 	return 0;
@@ -1197,7 +1359,7 @@ int naredba_skoka(std::shared_ptr<Node> root) {
 		root->children.at(1)->symbol == "TOCKAZAREZ") {
 		// 1. naredba se nalazi unutar petlje ili unutar bloka koji je
 		// ugnijezden u petlji
-		if (loop_depth == 0) {
+		if (loop_depth < 1) {
 			return root->semantic_error();
 		}
 	}
@@ -1241,7 +1403,9 @@ int prijevodna_jedinica(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<vanjska_deklaracija>") {
 		// 1. provjeri(<vanjska_deklaracija>)
-		vanjska_deklaracija(root->children.at(0));
+		if (vanjska_deklaracija(root->children.at(0))) {
+			return 1;
+		}
 	}
 	// <prijevodna_jedinica> ::= <prijevodna_jedinica> <vanjska_deklaracija>
 	else if (root->children.size() == 2 &&
@@ -1249,10 +1413,13 @@ int prijevodna_jedinica(std::shared_ptr<Node> root) {
 			 root->children.at(1)->symbol == "<vanjska_deklaracija>") {
 		// 1. provjeri(<prijevodna_jedinica>)
 		// 2. provjeri(<vanjska_deklaracija>)
-		prijevodna_jedinica(root->children.at(0));
-		vanjska_deklaracija(root->children.at(1));
+		if (prijevodna_jedinica(root->children.at(0))) {
+			return 1;
+		} else if (vanjska_deklaracija(root->children.at(1))) {
+			return 1;
+		}
 	} else {
-		root->semantic_error();
+		return root->semantic_error();
 	}
 	return 0;
 }
@@ -1530,8 +1697,14 @@ int deklaracija_parametra(std::shared_ptr<Node> root) {
 		}
 	}
 	// <deklaracija_parametra> ::= <ime_tipa> IDN L_UGL_ZAGRADA
-	// D_UGL_ZAGRADA tip ← niz(<ime_tipa>.tip) ime ← IDN.ime
-	else if (root->children.size() == 4) {
+	// D_UGL_ZAGRADA
+	// tip ← niz(<ime_tipa>.tip)
+	// ime ← IDN.ime
+	else if (root->children.size() == 4 &&
+			 root->children.at(0)->symbol == "<ime_tipa>" &&
+			 root->children.at(1)->symbol == "IDN" &&
+			 root->children.at(2)->symbol == "L_UGL_ZAGRADA" &&
+			 root->children.at(3)->symbol == "D_UGL_ZAGRADA") {
 		// 1. provjeri(<ime_tipa>)
 		// 2. <ime_tipa>.tip ̸= void
 		if (ime_tipa(root->children.at(0))) {
@@ -1923,11 +2096,14 @@ int lista_izraza_pridruzivanja(std::shared_ptr<Node> root) {
 	// 	<lista_izraza_pridruzivanja> ::= <izraz_pridruzivanja>
 	// tipovi ← [ <izraz_pridruzivanja>.tip ]
 	// br-elem ← 1
+	{
+		{
+		}
+	}
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<izraz_pridruzivanja>") {
 		// 1. provjeri(<izraz_pridruzivanja>)
-		izraz_pridruzivanja(root->children.at(0));
-		if (0) {
+		if (izraz_pridruzivanja(root->children.at(0))) {
 			return 1;
 		}
 		root->arg_types.push_back(root->children.at(0)->type);
@@ -1947,8 +2123,7 @@ int lista_izraza_pridruzivanja(std::shared_ptr<Node> root) {
 		if (lista_izraza_pridruzivanja(root->children.at(0))) {
 			return 1;
 		} else {
-			izraz_pridruzivanja(root->children.at(2));
-			if (0) {
+			if (izraz_pridruzivanja(root->children.at(2))) {
 				return 1;
 			}
 			root->arg_types = root->children.at(0)->arg_types;

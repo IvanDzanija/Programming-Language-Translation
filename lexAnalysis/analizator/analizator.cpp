@@ -1,18 +1,15 @@
 #include <algorithm>
-#include <chrono>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <set>
 #include <stack>
 #include <string>
-#include <thread>
 #include <vector>
 using ll = int64_t;
 
 struct NDFA {
 	std::string lex_state;
-
 	std::vector<std::vector<std::string>> args;
 	std::multimap<std::pair<int, char>, int> transitions;
 	std::set<int> acc;
