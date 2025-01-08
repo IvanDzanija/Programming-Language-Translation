@@ -42,7 +42,6 @@ class Node {
 			}
 		}
 		std::cout << std::endl;
-		exit(1);
 		return 1;
 	}
 };
