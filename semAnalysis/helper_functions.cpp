@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 // helper functions
-void debug() { std::cout << "I'm here" << std::endl; }
 
 bool accepted_char(std::string to_check) {
 	if (to_check.size() == 1) {

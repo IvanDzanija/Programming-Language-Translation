@@ -12,6 +12,7 @@ int primarni_izraz(std::shared_ptr<Node> root);
 int postfiks_izraz(std::shared_ptr<Node> root);
 int lista_argumenata(std::shared_ptr<Node> root);
 int unarni_izraz(std::shared_ptr<Node> root);
+int unarni_operator(std::shared_ptr<Node> root);
 int cast_izraz(std::shared_ptr<Node> root);
 int ime_tipa(std::shared_ptr<Node> root);
 int specifikator_tipa(std::shared_ptr<Node> root);

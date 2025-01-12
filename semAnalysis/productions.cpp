@@ -25,6 +25,7 @@ std::unordered_multimap<
 bool main_defined = false;
 int block_count = 0;
 bool from_function = false;
+bool is_minus = false;
 
 int primarni_izraz(std::shared_ptr<Node> root) {
 	// <primarni_izraz> ::= IDN
@@ -115,8 +116,14 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 	else if (root->children.size() == 1 &&
 			 root->children.at(0)->symbol == "BROJ") {
 		// 1. vrijednost je u rasponu tipa int
+		std::string current_value = "";
+		if (is_minus) {
+			current_value += "-";
+		}
+		is_minus = false;
+		current_value += root->children.at(0)->value;
 		try {
-			int temp = std::stoi(root->children.at(0)->value);
+			int temp = std::stoi(current_value, nullptr, 0);
 		} catch (const std::out_of_range &oor) {
 			return root->semantic_error();
 		}
@@ -406,7 +413,9 @@ int unarni_izraz(std::shared_ptr<Node> root) {
 			  root->children.at(1)->symbol == "<cast_izraz>")) {
 		// 1. provjeri(<cast_izraz>)
 		// 2. <cast_izraz>.tip ∼ int
-		if (cast_izraz(root->children.at(1))) {
+		if (unarni_operator(root->children.at(0))) {
+			return 1;
+		} else if (cast_izraz(root->children.at(1))) {
 			return 1;
 		} else {
 			if (!implicit_conversion(root->children.at(1)->type, "int")) {
@@ -414,11 +423,19 @@ int unarni_izraz(std::shared_ptr<Node> root) {
 			} else {
 				root->type = "int";
 				root->lhs = false;
+				is_minus = false;
 			}
 		}
 
 	} else {
 		return root->semantic_error();
+	}
+	return 0;
+}
+
+int unarni_operator(std::shared_ptr<Node> root) {
+	if (root->children.at(0)->symbol == "MINUS") {
+		is_minus = true;
 	}
 	return 0;
 }
