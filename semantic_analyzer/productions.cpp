@@ -29,9 +29,6 @@ bool main_defined = false;
 int block_count = 0;
 bool from_function = false;
 bool is_minus = false;
-
-int current_params_count = 0;
-int current_local_count = 0;
 int primarni_izraz(std::shared_ptr<Node> root) {
 	// <primarni_izraz> ::= IDN
 	// tip ← IDN.tip
@@ -57,16 +54,7 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 			} else {
 				root->lhs = true;
 			}
-			if (current_global_variable != "") {
-				std::string next_name = "V";
-				next_name += std::to_string(code_global_variables.size());
-				code_global_variables.emplace(make_pair(
-					current_global_variable,
-					make_pair(next_name, code_global_variables
-											 .at(root->children.at(0)->value)
-											 .second)));
-				current_global_variable = "";
-			}
+			load_var(root->children.at(0)->value);
 		}
 		// check if its a function
 		if (available_functions.count(root->children.at(0)->value)) {
@@ -120,6 +108,7 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 				root->type = current_type;
 				root->lhs = false;
 			}
+			load_array(root->children.at(0)->value);
 		} else if (deepest_block == -1) {
 			return root->semantic_error();
 		}
@@ -144,21 +133,19 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 		}
 		root->type = "int";
 		root->lhs = false;
-		std::string const_value = std::to_string(temp);
-		if (!code_constants.count(const_value)) {
+		if (!code_constants.count(temp)) {
 			std::string next_name = "C";
 			next_name += std::to_string(code_constants.size());
-			code_constants.emplace(make_pair(const_value, next_name));
+			code_constants.emplace(std::make_pair(temp, next_name));
 		}
+		load_const(code_constants.at(temp));
 		if (current_global_variable != "") {
-			std::string next_name = "V";
-			next_name += std::to_string(code_global_variables.size());
-			code_global_variables.emplace(
-				make_pair(current_global_variable,
-						  make_pair(next_name, root->children.at(0)->value)));
+			if (!global_var_init.count(current_global_variable)) {
+				global_var_init.emplace(
+					make_pair(current_global_variable, temp));
+			}
 			current_global_variable = "";
 		}
-		load_const(code_constants.at(root->children.at(0)->value));
 	}
 	// <primarni_izraz> ::= ZNAK
 	// tip ← char
@@ -180,26 +167,30 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 			} else {
 				root->type = "char";
 				root->lhs = false;
-				if (!code_constants.count(root->children.at(0)->value)) {
+				int cval = (int)root->children.at(0)->value.at(
+					root->children.size() - 2);
+				if (!code_constants.count(cval)) {
 					std::string next_name = "C";
 					next_name += std::to_string(code_constants.size());
-					code_constants.emplace(make_pair(
-						std::to_string(std::stoi(root->children.at(0)->value)),
-						next_name));
+					code_constants.emplace(std::make_pair(cval, next_name));
 				}
+				// if (current_global_variable != "") {
+				// 	std::string next_name = "V";
+				// 	next_name += std::to_string(code_global_variables.size());
+				// 	code_global_variables.emplace(std::make_pair(
+				// 		current_global_variable,
+				// 		std::make_pair(next_name, std::to_string(std::stoi(
+				// 								 root->children.at(0)->value)))));
+				// 	current_global_variable = "";
+				// }
 				load_const(root->children.at(0)->value);
+				// if (current_global_variable != "") {
+				// 	store_global(current_global_variable);
+				// 	current_global_variable = "";
+				// }
 			}
 		}
 
-		// if (current_global_variable != "") {
-		// 	std::string next_name = "V";
-		// 	next_name += std::to_string(code_global_variables.size());
-		// 	code_global_variables.emplace(make_pair(
-		// 		current_global_variable,
-		// 		make_pair(next_name, std::to_string(std::stoi(
-		// 								 root->children.at(0)->value)))));
-		// 	current_global_variable = "";
-		// }
 	}
 	// <primarni_izraz> ::= NIZ_ZNAKOVA
 	// tip ← niz(const(char))
@@ -1141,9 +1132,10 @@ int slozena_naredba(std::shared_ptr<Node> root) {
 	for (auto function : available_functions) {
 		if (function.second.first == 0) {
 			std::string key = function.first;
-			std::pair<std::string, std::vector<std::string>> value = make_pair(
-				function.second.second.first, function.second.second.second);
-			global_declared_functions.insert(make_pair(key, value));
+			std::pair<std::string, std::vector<std::string>> value =
+				std::make_pair(function.second.second.first,
+							   function.second.second.second);
+			global_declared_functions.insert(std::make_pair(key, value));
 		}
 	}
 	// <slozena_naredba> ::= L_VIT_ZAGRADA <lista_naredbi> D_VIT_ZAGRADA
@@ -1172,6 +1164,7 @@ int slozena_naredba(std::shared_ptr<Node> root) {
 		return root->semantic_error();
 	}
 	local_names.clear();
+
 	// possibly extremely inefficient and needed a change to inplace deletion
 	// while iterating
 	std::unordered_multimap<std::string, std::pair<int, std::string>>
@@ -1187,6 +1180,10 @@ int slozena_naredba(std::shared_ptr<Node> root) {
 		if (array.second.first != block_count) {
 			new_available_arrays.insert(array);
 		}
+		auto range = code_local_arrays.equal_range(array.first);
+		if (range.first != range.second) {
+			code_local_arrays.erase(std::prev(range.second));
+		}
 	}
 	for (auto function : available_functions) {
 		if (function.second.first != block_count) {
@@ -1199,6 +1196,10 @@ int slozena_naredba(std::shared_ptr<Node> root) {
 	for (auto variable : available_variables) {
 		if (variable.second.first != block_count) {
 			new_available_variables.insert(variable);
+		}
+		auto range = code_local_variables.equal_range(variable.first);
+		if (range.first != range.second) {
+			code_local_variables.erase(std::prev(range.second));
 		}
 	}
 	available_arrays.swap(new_available_arrays);
@@ -1529,6 +1530,7 @@ int vanjska_deklaracija(std::shared_ptr<Node> root) {
 	return 0;
 }
 
+// possibly void funcs have no return ;
 int definicija_funkcije(std::shared_ptr<Node> root) {
 	// <definicija_funkcije> ::= <ime_tipa> IDN L_ZAGRADA KR_VOID D_ZAGRADA
 	// <slozena_naredba>
@@ -1547,6 +1549,7 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 		// <ime_tipa>.tip)
 		// 5. zabiljezi definiciju i deklaraciju funkcije
 		// 6. provjeri(<slozena_naredba>)
+
 		if (ime_tipa(root->children.at(0))) {
 			return 1;
 		} else {
@@ -1562,8 +1565,8 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 				} else {
 					std::vector<std::string> arguments(0);
 					std::pair<std::string, std::vector<std::string>>
-						function_key =
-							make_pair(root->children.at(0)->type, arguments);
+						function_key = std::make_pair(
+							root->children.at(0)->type, arguments);
 					if (global_declared_functions.count(
 							root->children.at(1)->value) &&
 						global_declared_functions.at(
@@ -1579,14 +1582,22 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 						}
 
 						// currenly in function
-						available_functions.insert(
-							make_pair(root->children.at(1)->value,
-									  make_pair(block_count, function_key)));
+						available_functions.insert(std::make_pair(
+							root->children.at(1)->value,
+							std::make_pair(block_count, function_key)));
 						local_names.insert(root->children.at(1)->value);
 						current_function_return_type =
 							root->children.at(0)->type;
 						current_function_argument_types = arguments;
 						from_function = true;
+
+						// generate new label
+						std::string next_name = "F";
+						next_name += std::to_string(code_functions.size());
+						code_functions.emplace(std::make_pair(
+							root->children.at(1)->value, next_name));
+						fn_def(next_name,
+							   current_function_argument_types.size());
 						if (slozena_naredba(root->children.at(5))) {
 							return 1;
 						} else {
@@ -1634,8 +1645,8 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 					} else {
 						std::pair<std::string, std::vector<std::string>>
 							function_key =
-								make_pair(root->children.at(0)->type,
-										  root->children.at(3)->arg_types);
+								std::make_pair(root->children.at(0)->type,
+											   root->children.at(3)->arg_types);
 						if (global_declared_functions.count(
 								root->children.at(1)->value) &&
 							global_declared_functions.at(
@@ -1659,9 +1670,9 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 							// previous_function_argument_types =
 							// current_function_argument_types; currenly in new
 							// function
-							available_functions.insert(make_pair(
+							available_functions.insert(std::make_pair(
 								root->children.at(1)->value,
-								make_pair(block_count, function_key)));
+								std::make_pair(block_count, function_key)));
 
 							local_names.insert(root->children.at(1)->value);
 							current_function_return_type =
@@ -1669,14 +1680,22 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 							current_function_argument_types =
 								root->children.at(3)->arg_types;
 
+							// generate new label
+							std::string next_name = "F";
+							next_name += std::to_string(code_functions.size());
+							code_functions.emplace(std::make_pair(
+								root->children.at(1)->value, next_name));
+							fn_def(next_name,
+								   current_function_argument_types.size());
+
 							for (size_t i = 0;
 								 i < root->children.at(3)->arg_types.size();
 								 ++i) {
-								available_variables.insert(make_pair(
+								available_variables.insert(std::make_pair(
 									root->children.at(3)->arg_names.at(i),
-									make_pair(block_count + 1,
-											  root->children.at(3)
-												  ->arg_types.at(i))));
+									std::make_pair(block_count + 1,
+												   root->children.at(3)
+													   ->arg_types.at(i))));
 								local_names.insert(
 									root->children.at(3)->arg_names.at(i));
 								current_function_argument_names.push_back(
@@ -1908,6 +1927,7 @@ int init_deklarator(std::shared_ptr<Node> root) {
 			if (is_const(root->children.at(0)->type) ||
 				is_const(remove_array(root->children.at(0)->type))) {
 				return root->semantic_error();
+			} else {
 			}
 		}
 	}
@@ -1986,6 +2006,15 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 				local_names.insert(root->children.at(0)->value);
 				if (block_count == 0) {
 					current_global_variable = root->children.at(0)->value;
+					std::string next_name = "V";
+					next_name += std::to_string(code_global_variables.size());
+					code_global_variables.emplace(
+						std::make_pair(root->children.at(0)->value, next_name));
+					// stores global variable after it was changed;
+				} else {
+					code_local_variables.emplace(
+						std::make_pair(root->children.at(0)->value,
+									   code_local_variables.size() * 4));
 				}
 			}
 		}
@@ -2020,11 +2049,28 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 					current_type += ")";
 					root->type = current_type;
 					root->element_count = number;
-					available_arrays.insert(
-						make_pair(root->children.at(0)->value,
-								  make_pair(block_count,
-											make_pair(current_type, number))));
+					available_arrays.insert(std::make_pair(
+						root->children.at(0)->value,
+						std::make_pair(block_count,
+									   std::make_pair(current_type, number))));
 					local_names.insert(root->children.at(0)->value);
+
+					if (block_count == 0) {
+						current_global_array = root->children.at(0)->value;
+						std::string next_name = "A";
+						next_name += std::to_string(code_global_arrays.size());
+						code_global_arrays.emplace(
+							std::make_pair(root->children.at(0)->value,
+										   std::make_pair(next_name, number)));
+					} else {
+						code_local_variables.emplace(
+							std::make_pair(root->children.at(0)->value,
+										   code_local_variables.size() * 4));
+						code_local_arrays.emplace(std::make_pair(
+							root->children.at(0)->value,
+							std::make_pair(code_local_arrays.size() * 4,
+										   number)));
+					}
 				} catch (const std::out_of_range &oor) {
 					return root->semantic_error();
 				}
@@ -2043,9 +2089,9 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 		// 2. zabiljezi deklaraciju IDN.ime s odgovarajucim tipom ako ista
 		// funkcija vec nije deklarirana u lokalnom djelokrugu
 		std::pair<int, std::pair<std::string, std::vector<std::string>>>
-			function_value =
-				make_pair(block_count, make_pair(root->inherited_type,
-												 std::vector<std::string>()));
+			function_value = std::make_pair(
+				block_count, std::make_pair(root->inherited_type,
+											std::vector<std::string>()));
 		if (local_names.count(root->children.at(0)->value)) {
 			if (available_functions.count(root->children.at(0)->value)) {
 				auto range = available_functions.equal_range(
@@ -2061,7 +2107,7 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 			}
 		} else {
 			available_functions.insert(
-				make_pair(root->children.at(0)->value, function_value));
+				std::make_pair(root->children.at(0)->value, function_value));
 			local_names.insert(root->children.at(0)->value);
 		}
 		std::string current_type = "funkcija(void -> ";
@@ -2085,9 +2131,10 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 			return 1;
 		} else {
 			std::pair<int, std::pair<std::string, std::vector<std::string>>>
-				function_value = make_pair(
-					block_count, make_pair(root->inherited_type,
-										   root->children.at(2)->arg_types));
+				function_value = std::make_pair(
+					block_count,
+					std::make_pair(root->inherited_type,
+								   root->children.at(2)->arg_types));
 			if (local_names.count(root->children.at(0)->value)) {
 				if (available_functions.count(root->children.at(0)->value)) {
 					auto range = available_functions.equal_range(
@@ -2102,8 +2149,8 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 					return root->semantic_error();
 				}
 			} else {
-				available_functions.insert(
-					make_pair(root->children.at(0)->value, function_value));
+				available_functions.insert(std::make_pair(
+					root->children.at(0)->value, function_value));
 				local_names.insert(root->children.at(0)->value);
 			}
 			// std::string current_type = "funkcija(";
@@ -2180,10 +2227,6 @@ int lista_izraza_pridruzivanja(std::shared_ptr<Node> root) {
 	// 	<lista_izraza_pridruzivanja> ::= <izraz_pridruzivanja>
 	// tipovi ← [ <izraz_pridruzivanja>.tip ]
 	// br-elem ← 1
-	{
-		{
-		}
-	}
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<izraz_pridruzivanja>") {
 		// 1. provjeri(<izraz_pridruzivanja>)

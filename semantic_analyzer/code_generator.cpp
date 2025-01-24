@@ -1,20 +1,28 @@
 #include "code_generator.hpp"
 #include <fstream>
+#include <iostream>
+#include <unordered_map>
+#include <vector>
 
 int logical_skip = 0;
+int local_stack = 0;
 std::ofstream code("a.frisc");
-std::unordered_map<std::string, std::pair<std::string, std::string>>
-	code_global_variables;
+std::unordered_map<std::string, std::string>
+	code_global_variables; // name -> address
+std::unordered_map<std::string, int> global_var_init;
+std::unordered_map<std::string, std::pair<std::string, int>> code_global_arrays;
 std::string current_global_variable;
-std::unordered_map<std::string, std::string> code_constants;
+std::string current_global_array;
+std::unordered_map<int, std::string> code_constants;
 std::unordered_map<std::string, std::string> code_functions;
+std::unordered_multimap<std::string, int> code_local_variables;
+std::unordered_multimap<std::string, std::pair<int, int>> code_local_arrays;
 
 void code_init(void) {
 	code << "\tMOVE 40000, R7" << std::endl;
-	code << "\tSUB R7, %D 8, R2" << std::endl;
+	code << "\tSUB R7, %D 4, R2" << std::endl;
 	code << "\tCALL F0" << std::endl;
 	code << "\tHALT" << std::endl;
-	// code.close();
 }
 void save_context(void) {
 	code << "\tPUSH R0" << std::endl;
@@ -33,11 +41,70 @@ void refresh_context(void) {
 	code << "\tPOP R0" << std::endl;
 }
 
-void fn_def(std::string name) { code << "F" << name << std::endl; }
+void fn_def(std::string name, int argc) {
+	code << name << "\tSUB R7, %D " << 4 * argc << ", R7" << std::endl;
+}
 
 void return_sp(void) {
 	code << "\tMOVE R2, R7" << std::endl;
 	code << "\tRET" << std::endl;
+}
+
+void call_fn(std::string name, std::vector<int> args) {
+	code << "\tSUB R7, %D 4, R2" << std::endl;
+	// treba i spremiti parametre
+	// for (int arg: args){
+	// 	code <<
+	// }
+	code << "\t CALL " << name << std::endl;
+}
+void load_var(std::string name) {
+	// first check local defs!
+	// std::cout << name << std::endl;
+	// for (auto x : code_global_variables) {
+	// 	std::cout << x.first << ' ' << x.second << std::endl;
+	// }
+	if (code_local_variables.count(name)) {
+		auto range = code_local_variables.equal_range(name);
+		code << "\tLOAD R0, " << "(R7 +" /*<< std::hex << std::uppercase*/
+			 << std::prev(range.second)->second << ')' << std::endl;
+		code << "\tPUSH R0" << std::endl;
+
+	} else if (code_global_variables.count(name)) {
+		code << "\tLOAD R0, " << "(" << code_global_variables.at(name) << ')'
+			 << std::endl;
+		code << "\tPUSH R0" << std::endl;
+	}
+}
+
+void load_array(std::string name) {
+	// saved on stack -> moving up
+	if (code_local_arrays.count(name)) {
+		auto range = code_local_arrays.equal_range(name);
+		int length = prev(range.second)->second.second;
+		int loc = prev(range.second)->second.first;
+		for (int i = 0; i < length; ++i) {
+			code << "\tLOAD R0, " << "(R7 +" << loc - i * 4 << ')' << std::endl;
+			code << "\tPUSH R0" << std::endl;
+		}
+	}
+	// saved in memory -> moving down
+	else if (code_global_arrays.count(name)) {
+		auto range = code_global_arrays.equal_range(name);
+		std::string loc = code_global_arrays.at(name).first;
+		int length = code_global_arrays.at(name).second;
+		code << "\tMOVE " << loc << ", R1" << std::endl;
+		for (int i = 0; i < length; ++i) {
+			code << "\tLOAD R0, (R1)" << std::endl;
+			code << "\tPUSH R0" << std::endl;
+			code << "\t ADD R1, 4, R1" << std::endl;
+		}
+	}
+}
+
+void store_global(std::string name) {
+	code << "\tSTORE R0, " << '(' << code_global_variables.at(name) << ')'
+		 << std::endl;
 }
 
 void load_ret_val(void) { code << "\tPOP R6" << std::endl; }
@@ -45,11 +112,11 @@ void load_ret_val(void) { code << "\tPOP R6" << std::endl; }
 void unary_operation(int8_t op) {
 	if (op == -1) {
 		code << "\tPOP R0" << std::endl;
-		code << "\tSUB R0, 1, RO" << std::endl;
+		code << "\tSUB R0, 1, R0" << std::endl;
 		code << "\tPUSH R0" << std::endl;
 	} else {
 		code << "\tPOP R0" << std::endl;
-		code << "\tADD R0, 1, RO" << std::endl;
+		code << "\tADD R0, 1, R0" << std::endl;
 		code << "\tPUSH R0" << std::endl;
 	}
 }
@@ -59,12 +126,12 @@ void binary_operation(int8_t op) {
 	if (op == -1) {
 		code << "\tPOP R0" << std::endl; // second operand
 		code << "\tPOP R1" << std::endl; // first operand
-		code << "\tSUB R1, R0, RO" << std::endl;
+		code << "\tSUB R1, R0, R0" << std::endl;
 		code << "\tPUSH R0" << std::endl;
 	} else {
 		code << "\tPOP R0" << std::endl; // second operand
 		code << "\tPOP R1" << std::endl; // first operand
-		code << "\tADD R1, R0, RO" << std::endl;
+		code << "\tADD R1, R0, R0" << std::endl;
 		code << "\tPUSH R0" << std::endl;
 	}
 }
@@ -120,8 +187,16 @@ void load_const(std::string var) {
 }
 
 void fill_globals(void) {
+
 	for (auto x : code_global_variables) {
-		code << x.second.first << "\tDW %D " << x.second.second << std::endl;
+		// std::cout << x.first << std::endl;
+		// std::cout << x.second << std::endl;
+		if (global_var_init.count(x.first)) {
+			code << x.second << "\tDW %D " << global_var_init.at(x.first)
+				 << std::endl;
+		} else {
+			code << x.second << std::endl;
+		}
 	}
 }
 
