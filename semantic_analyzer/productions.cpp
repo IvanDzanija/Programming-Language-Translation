@@ -2,6 +2,7 @@
 #include "helper_functions.hpp"
 #include "productions.hpp"
 #include <memory>
+#include <stack>
 #include <string>
 
 // global variables;
@@ -29,6 +30,9 @@ bool main_defined = false;
 int block_count = 0;
 bool from_function = false;
 bool is_minus = false;
+std::stack<bool> calling_function;
+std::stack<std::string> fn_call_name;
+
 int primarni_izraz(std::shared_ptr<Node> root) {
 	// <primarni_izraz> ::= IDN
 	// tip ← IDN.tip
@@ -75,6 +79,9 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 						arguments = it->second.second.second;
 					}
 				}
+			}
+			if (!calling_function.empty()) {
+				fn_call_name.push(root->children.at(0)->value);
 			}
 			if (convert) {
 				root->type = "funkcija(";
@@ -301,14 +308,19 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 			 root->children.at(2)->symbol == "D_ZAGRADA") {
 		// 1. provjeri(<postfiks_izraz>)
 		// 2. < postfiks_izraz >.tip = funkcija(void → pov)
+		calling_function.push(true);
 		if (postfiks_izraz(root->children.at(0))) {
 			return 1;
 		} else {
+			calling_function.pop();
 			if (root->children.at(0)->type != "funkcija(void -> pov)") {
 				return root->semantic_error();
 			} else {
 				root->type = root->children.at(0)->return_type;
 				root->lhs = false;
+				std::string fn_name = fn_call_name.top();
+				fn_call_name.pop();
+				call_fn(fn_name, std::vector<std::string>());
 			}
 		}
 	}
@@ -1593,7 +1605,12 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 
 						// generate new label
 						std::string next_name = "F";
-						next_name += std::to_string(code_functions.size());
+						if (root->children.at(1)->value == "main") {
+							next_name += '0';
+						} else {
+							next_name +=
+								std::to_string(code_functions.size() + 1);
+						}
 						code_functions.emplace(std::make_pair(
 							root->children.at(1)->value, next_name));
 						fn_def(next_name,

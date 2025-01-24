@@ -2,7 +2,6 @@
 #include <fstream>
 #include <iostream>
 #include <unordered_map>
-#include <vector>
 
 int logical_skip = 0;
 int local_stack = 0;
@@ -21,7 +20,7 @@ std::unordered_multimap<std::string, std::pair<int, int>> code_local_arrays;
 void code_init(void) {
 	code << "\tMOVE 40000, R7" << std::endl;
 	code << "\tSUB R7, %D 4, R2" << std::endl;
-	code << "\tCALL F0" << std::endl;
+	code << "\tCALL" << std::endl;
 	code << "\tHALT" << std::endl;
 }
 void save_context(void) {
@@ -50,13 +49,13 @@ void return_sp(void) {
 	code << "\tRET" << std::endl;
 }
 
-void call_fn(std::string name, std::vector<int> args) {
+void call_fn(std::string name, std::vector<std::string> args) {
 	code << "\tSUB R7, %D 4, R2" << std::endl;
 	// treba i spremiti parametre
 	// for (int arg: args){
 	// 	code <<
 	// }
-	code << "\t CALL " << name << std::endl;
+	code << "\tCALL " << code_functions.at(name) << std::endl;
 }
 void load_var(std::string name) {
 	// first check local defs!
@@ -66,7 +65,7 @@ void load_var(std::string name) {
 	// }
 	if (code_local_variables.count(name)) {
 		auto range = code_local_variables.equal_range(name);
-		code << "\tLOAD R0, " << "(R7 +" /*<< std::hex << std::uppercase*/
+		code << "\tLOAD R0, " << "(R7 + %D " /*<< std::hex << std::uppercase*/
 			 << std::prev(range.second)->second << ')' << std::endl;
 		code << "\tPUSH R0" << std::endl;
 
@@ -90,14 +89,13 @@ void load_array(std::string name) {
 	}
 	// saved in memory -> moving down
 	else if (code_global_arrays.count(name)) {
-		auto range = code_global_arrays.equal_range(name);
 		std::string loc = code_global_arrays.at(name).first;
 		int length = code_global_arrays.at(name).second;
 		code << "\tMOVE " << loc << ", R1" << std::endl;
 		for (int i = 0; i < length; ++i) {
 			code << "\tLOAD R0, (R1)" << std::endl;
 			code << "\tPUSH R0" << std::endl;
-			code << "\t ADD R1, 4, R1" << std::endl;
+			code << "\t ADD R1, %D 4, R1" << std::endl;
 		}
 	}
 }

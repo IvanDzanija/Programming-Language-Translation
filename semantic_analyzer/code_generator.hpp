@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 extern std::unordered_map<std::string, std::string> code_global_variables;
 extern std::string current_global_variable;
@@ -30,3 +31,4 @@ void load_const(std::string var);
 void load_var(std::string name);
 void load_array(std::string name);
 void store_global(std::string name);
+void call_fn(std::string name, std::vector<std::string>);
