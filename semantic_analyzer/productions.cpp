@@ -174,23 +174,22 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 			} else {
 				root->type = "char";
 				root->lhs = false;
+
 				int cval = (int)root->children.at(0)->value.at(
-					root->children.size() - 2);
+					root->children.at(0)->value.size() - 2);
 				if (!code_constants.count(cval)) {
 					std::string next_name = "C";
 					next_name += std::to_string(code_constants.size());
 					code_constants.emplace(std::make_pair(cval, next_name));
 				}
-				// if (current_global_variable != "") {
-				// 	std::string next_name = "V";
-				// 	next_name += std::to_string(code_global_variables.size());
-				// 	code_global_variables.emplace(std::make_pair(
-				// 		current_global_variable,
-				// 		std::make_pair(next_name, std::to_string(std::stoi(
-				// 								 root->children.at(0)->value)))));
-				// 	current_global_variable = "";
-				// }
-				load_const(root->children.at(0)->value);
+				if (current_global_variable != "") {
+					if (!global_var_init.count(current_global_variable)) {
+						global_var_init.emplace(
+							make_pair(current_global_variable, cval));
+					}
+					current_global_variable = "";
+				}
+				load_const(code_constants.at(cval));
 				// if (current_global_variable != "") {
 				// 	store_global(current_global_variable);
 				// 	current_global_variable = "";
@@ -1763,7 +1762,7 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 									// 	code_local_arrays.emplace(make_pair())
 								} else {
 									code_local_variables.emplace(
-										make_pair(current_name, i * 4));
+										make_pair(current_name, (i + 1) * 4));
 								}
 							}
 
@@ -2090,10 +2089,11 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 					code_global_variables.emplace(
 						std::make_pair(root->children.at(0)->value, next_name));
 					// stores global variable after it was changed;
+					// ??
 				} else {
 					code_local_variables.emplace(
 						std::make_pair(root->children.at(0)->value,
-									   code_local_variables.size() * 4));
+									   code_local_variables.size() * 4 + 4));
 				}
 			}
 		}
@@ -2142,9 +2142,9 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 							std::make_pair(root->children.at(0)->value,
 										   std::make_pair(next_name, number)));
 					} else {
-						code_local_variables.emplace(
-							std::make_pair(root->children.at(0)->value,
-										   code_local_variables.size() * 4));
+						// code_local_variables.emplace(
+						// 	std::make_pair(root->children.at(0)->value,
+						// 				   code_local_variables.size() * 4));
 						code_local_arrays.emplace(std::make_pair(
 							root->children.at(0)->value,
 							std::make_pair(code_local_arrays.size() * 4,

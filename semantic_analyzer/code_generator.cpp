@@ -71,8 +71,9 @@ void load_var(std::string name) {
 	// }
 	if (code_local_variables.count(name)) {
 		auto range = code_local_variables.equal_range(name);
-		code << "\tLOAD R0, " << "(R7+" /*<< std::hex << std::uppercase*/
+		code << "\tLOAD R0, " << "(R2-0" << std::hex << std::uppercase
 			 << std::prev(range.second)->second << ')' << std::endl;
+		code << std::dec;
 		code << "\tPUSH R0" << std::endl;
 
 	} else if (code_global_variables.count(name)) {
