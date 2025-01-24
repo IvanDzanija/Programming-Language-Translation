@@ -14,7 +14,7 @@ std::string current_global_variable;
 std::string current_global_array;
 std::unordered_map<int, std::string> code_constants;
 std::unordered_map<std::string, std::string> code_functions;
-std::unordered_multimap<std::string, int> code_local_variables;
+std::multimap<std::string, int> code_local_variables;
 std::unordered_multimap<std::string, std::pair<int, int>> code_local_arrays;
 
 void code_init(void) {
@@ -49,18 +49,16 @@ void return_sp(void) {
 	code << "\tRET" << std::endl;
 }
 
-void call_fn(std::string name, std::vector<std::string> args) {
+void call_fn(std::string name, size_t argc) {
+	while (argc--) {
+		code << "\tADD R7, %D 4, R7" << std::endl;
+	}
 	code << "\tSUB R7, %D 4, R2" << std::endl;
-	// treba i spremiti parametre
-	// for (int arg: args){
-	// 	code <<
-	// }
 	code << "\tCALL " << code_functions.at(name) << std::endl;
 }
 void load_var(std::string name) {
 	// first check local defs!
-	// std::cout << name << std::endl;
-	// for (auto x : code_global_variables) {
+	// for (auto x : code_local_variables) {
 	// 	std::cout << x.first << ' ' << x.second << std::endl;
 	// }
 	if (code_local_variables.count(name)) {
@@ -186,10 +184,7 @@ void load_const(std::string var) {
 }
 
 void fill_globals(void) {
-
 	for (auto x : code_global_variables) {
-		// std::cout << x.first << std::endl;
-		// std::cout << x.second << std::endl;
 		if (global_var_init.count(x.first)) {
 			code << x.second << "\tDW %D " << global_var_init.at(x.first)
 				 << std::endl;

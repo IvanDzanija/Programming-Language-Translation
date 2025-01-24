@@ -309,6 +309,7 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 		// 1. provjeri(<postfiks_izraz>)
 		// 2. < postfiks_izraz >.tip = funkcija(void → pov)
 		calling_function.push(true);
+		save_context();
 		if (postfiks_izraz(root->children.at(0))) {
 			return 1;
 		} else {
@@ -317,11 +318,11 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 				return root->semantic_error();
 			} else {
 				root->type = root->children.at(0)->return_type;
+
 				root->lhs = false;
 				std::string fn_name = fn_call_name.top();
 				fn_call_name.pop();
-				save_context();
-				call_fn(fn_name, std::vector<std::string>());
+				call_fn(fn_name, 0);
 				refresh_context();
 				push_ret_val();
 			}
@@ -341,6 +342,8 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 		// 3. <postfiks_izraz>.tip = funkcija(params → pov) i redom po
 		// elementima arg-tip iz <lista_argumenata>.tipovi i param-tip iz
 		// params vrijedi arg-tip ∼ param-tip
+		calling_function.push(true);
+		save_context();
 		if (postfiks_izraz(root->children.at(0))) {
 			return 1;
 		} else {
@@ -353,6 +356,12 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 				} else {
 					root->type = root->children.at(0)->return_type;
 					root->lhs = false;
+
+					std::string fn_name = fn_call_name.top();
+					fn_call_name.pop();
+					call_fn(fn_name, root->children.at(2)->arg_types.size());
+					refresh_context();
+					push_ret_val();
 				}
 			}
 		}
@@ -397,6 +406,7 @@ int lista_argumenata(std::shared_ptr<Node> root) {
 			return 1;
 		} else {
 			root->arg_types.push_back(root->children.at(0)->type);
+			root->arg_names.push_back(root->children.at(0)->name);
 		}
 	}
 	// <lista_argumenata> ::= <lista_argumenata> ZAREZ <izraz_pridruzivanja>
@@ -413,6 +423,8 @@ int lista_argumenata(std::shared_ptr<Node> root) {
 			return 1;
 		} else {
 			root->arg_types = root->children.at(0)->arg_types;
+			root->arg_names = root->children.at(0)->arg_names;
+			root->arg_names.push_back(root->children.at(0)->name);
 			root->arg_types.push_back(root->children.at(2)->type);
 		}
 
@@ -455,6 +467,7 @@ int unarni_izraz(std::shared_ptr<Node> root) {
 				return root->semantic_error();
 			} else {
 				root->type = "int";
+
 				root->lhs = false;
 			}
 		}
@@ -477,6 +490,7 @@ int unarni_izraz(std::shared_ptr<Node> root) {
 				return root->semantic_error();
 			} else {
 				root->type = "int";
+
 				root->lhs = false;
 				is_minus = false;
 			}
@@ -642,6 +656,7 @@ int multiplikativni_izraz(std::shared_ptr<Node> root) {
 				return root->semantic_error();
 			} else {
 				root->type = "int";
+
 				root->lhs = false;
 			}
 		}
@@ -693,6 +708,7 @@ int aditivni_izraz(std::shared_ptr<Node> root) {
 					} else {
 						root->type = "int";
 						root->lhs = false;
+
 						if (root->children.at(1)->symbol == "PLUS") {
 							binary_operation(1);
 						} else {
@@ -750,6 +766,7 @@ int odnosni_izraz(std::shared_ptr<Node> root) {
 				return root->semantic_error();
 			} else {
 				root->type = "int";
+
 				root->lhs = false;
 			}
 		}
@@ -798,6 +815,7 @@ int jednakosni_izraz(std::shared_ptr<Node> root) {
 				return root->semantic_error();
 			} else {
 				root->type = "int";
+
 				root->lhs = false;
 			}
 		}
@@ -892,6 +910,7 @@ int bin_xili_izraz(std::shared_ptr<Node> root) {
 			} else {
 				root->type = "int";
 				root->lhs = false;
+
 				bitwise_operation(3);
 			}
 		}
@@ -1194,10 +1213,11 @@ int slozena_naredba(std::shared_ptr<Node> root) {
 	for (auto array : available_arrays) {
 		if (array.second.first != block_count) {
 			new_available_arrays.insert(array);
-		}
-		auto range = code_local_arrays.equal_range(array.first);
-		if (range.first != range.second) {
-			code_local_arrays.erase(std::prev(range.second));
+		} else {
+			auto range = code_local_arrays.equal_range(array.first);
+			if (range.first != range.second) {
+				code_local_arrays.erase(std::prev(range.second));
+			}
 		}
 	}
 	for (auto function : available_functions) {
@@ -1211,10 +1231,11 @@ int slozena_naredba(std::shared_ptr<Node> root) {
 	for (auto variable : available_variables) {
 		if (variable.second.first != block_count) {
 			new_available_variables.insert(variable);
-		}
-		auto range = code_local_variables.equal_range(variable.first);
-		if (range.first != range.second) {
-			code_local_variables.erase(std::prev(range.second));
+		} else {
+			auto range = code_local_variables.equal_range(variable.first);
+			if (range.first != range.second) {
+				code_local_variables.erase(std::prev(range.second));
+			}
 		}
 	}
 	available_arrays.swap(new_available_arrays);
@@ -1607,17 +1628,26 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 						from_function = true;
 
 						// generate new label
-						std::string next_name = "F";
 						if (root->children.at(1)->value == "main") {
-							next_name += '0';
+							code_functions.emplace(
+								std::make_pair("main", "F0"));
+							fn_def("F0", 0);
+						} else if (code_functions.count("main")) {
+							std::string next_name = "F";
+							next_name += std::to_string(code_functions.size());
+							code_functions.emplace(std::make_pair(
+								root->children.at(1)->value, next_name));
+							fn_def(next_name,
+								   current_function_argument_types.size());
 						} else {
+							std::string next_name = "F";
 							next_name +=
 								std::to_string(code_functions.size() + 1);
+							code_functions.emplace(std::make_pair(
+								root->children.at(1)->value, next_name));
+							fn_def(next_name,
+								   current_function_argument_types.size());
 						}
-						code_functions.emplace(std::make_pair(
-							root->children.at(1)->value, next_name));
-						fn_def(next_name,
-							   current_function_argument_types.size());
 						if (slozena_naredba(root->children.at(5))) {
 							return 1;
 						} else {
@@ -1701,12 +1731,41 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 								root->children.at(3)->arg_types;
 
 							// generate new label
-							std::string next_name = "F";
-							next_name += std::to_string(code_functions.size());
-							code_functions.emplace(std::make_pair(
-								root->children.at(1)->value, next_name));
-							fn_def(next_name,
-								   current_function_argument_types.size());
+							if (code_functions.count("main")) {
+								std::string next_name = "F";
+								next_name +=
+									std::to_string(code_functions.size());
+								code_functions.emplace(std::make_pair(
+									root->children.at(1)->value, next_name));
+								fn_def(next_name,
+									   current_function_argument_types.size());
+							} else {
+								std::string next_name = "F";
+								next_name +=
+									std::to_string(code_functions.size() + 1);
+								code_functions.emplace(std::make_pair(
+									root->children.at(1)->value, next_name));
+								fn_def(next_name,
+									   current_function_argument_types.size());
+							}
+
+							// write parameter names as local variables
+							// which is pushed first ???????
+							for (size_t i = 0;
+								 i < root->children.at(3)->arg_types.size();
+								 ++i) {
+								std::string current_type =
+									root->children.at(3)->arg_types.at(i);
+								std::string current_name =
+									root->children.at(3)->arg_names.at(i);
+								// fixati array;
+								if (is_array(current_type)) {
+									// 	code_local_arrays.emplace(make_pair())
+								} else {
+									code_local_variables.emplace(
+										make_pair(current_name, i * 4));
+								}
+							}
 
 							for (size_t i = 0;
 								 i < root->children.at(3)->arg_types.size();

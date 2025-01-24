@@ -1,7 +1,7 @@
 #include <cstdint>
+#include <map>
 #include <string>
 #include <unordered_map>
-#include <vector>
 
 extern std::unordered_map<std::string, std::string> code_global_variables;
 extern std::string current_global_variable;
@@ -10,7 +10,7 @@ extern std::unordered_map<std::string, std::pair<std::string, int>>
 	code_global_arrays;
 extern std::unordered_map<int, std::string> code_constants;
 extern std::unordered_map<std::string, std::string> code_functions;
-extern std::unordered_multimap<std::string, int> code_local_variables;
+extern std::multimap<std::string, int> code_local_variables;
 extern std::unordered_multimap<std::string, std::pair<int, int>>
 	code_local_arrays;
 extern std::unordered_map<std::string, int> global_var_init;
@@ -32,4 +32,4 @@ void load_var(std::string name);
 void push_ret_val(void);
 void load_array(std::string name);
 void store_global(std::string name);
-void call_fn(std::string name, std::vector<std::string>);
+void call_fn(std::string name, size_t);
