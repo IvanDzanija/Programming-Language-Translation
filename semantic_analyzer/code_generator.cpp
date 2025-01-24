@@ -41,6 +41,7 @@ void refresh_context(void) {
 }
 
 void fn_def(std::string name, int argc) {
+	// code << name << std::endl;
 	code << name << "\tSUB R7, %D " << 4 * argc << ", R7" << std::endl;
 }
 
@@ -50,11 +51,18 @@ void return_sp(void) {
 }
 
 void call_fn(std::string name, size_t argc) {
-	while (argc--) {
-		code << "\tADD R7, %D 4, R7" << std::endl;
+	int cnt = argc;
+	if (argc > 0) {
+		do {
+			code << "\tADD R7, %D 4, R7" << std::endl;
+		} while (argc--);
 	}
+
 	code << "\tSUB R7, %D 4, R2" << std::endl;
 	code << "\tCALL " << code_functions.at(name) << std::endl;
+	while (cnt--) {
+		code << "\tSUB R7, %D 4, R7" << std::endl;
+	}
 }
 void load_var(std::string name) {
 	// first check local defs!
@@ -63,7 +71,7 @@ void load_var(std::string name) {
 	// }
 	if (code_local_variables.count(name)) {
 		auto range = code_local_variables.equal_range(name);
-		code << "\tLOAD R0, " << "(R7 + %D " /*<< std::hex << std::uppercase*/
+		code << "\tLOAD R0, " << "(R7+" /*<< std::hex << std::uppercase*/
 			 << std::prev(range.second)->second << ')' << std::endl;
 		code << "\tPUSH R0" << std::endl;
 
