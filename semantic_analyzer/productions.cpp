@@ -320,7 +320,10 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 				root->lhs = false;
 				std::string fn_name = fn_call_name.top();
 				fn_call_name.pop();
+				save_context();
 				call_fn(fn_name, std::vector<std::string>());
+				refresh_context();
+				push_ret_val();
 			}
 		}
 	}

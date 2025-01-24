@@ -20,7 +20,7 @@ std::unordered_multimap<std::string, std::pair<int, int>> code_local_arrays;
 void code_init(void) {
 	code << "\tMOVE 40000, R7" << std::endl;
 	code << "\tSUB R7, %D 4, R2" << std::endl;
-	code << "\tCALL" << std::endl;
+	code << "\tCALL F0" << std::endl;
 	code << "\tHALT" << std::endl;
 }
 void save_context(void) {
@@ -106,6 +106,7 @@ void store_global(std::string name) {
 }
 
 void load_ret_val(void) { code << "\tPOP R6" << std::endl; }
+void push_ret_val(void) { code << "\tPUSH R6" << std::endl; }
 
 void unary_operation(int8_t op) {
 	if (op == -1) {

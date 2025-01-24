@@ -29,6 +29,7 @@ void fill_globals(void);
 void fill_consts(void);
 void load_const(std::string var);
 void load_var(std::string name);
+void push_ret_val(void);
 void load_array(std::string name);
 void store_global(std::string name);
 void call_fn(std::string name, std::vector<std::string>);
