@@ -1,7 +1,6 @@
 #include "code_generator.hpp"
 #include <fstream>
 #include <iostream>
-#include <unordered_map>
 
 int logical_skip = 0;
 int local_stack = 0;
@@ -9,6 +8,7 @@ std::ofstream code("a.frisc");
 std::unordered_map<std::string, std::string>
 	code_global_variables; // name -> address
 std::unordered_map<std::string, int> global_var_init;
+std::unordered_map<std::string, std::vector<int>> global_arr_init;
 std::unordered_map<std::string, std::pair<std::string, int>> code_global_arrays;
 std::string current_global_variable;
 std::string current_global_array;
@@ -92,12 +92,15 @@ void load_var(std::string name) {
 
 void load_array(std::string name) {
 	// saved on stack -> moving up
+	code << "\tPOP R3" << std::endl;
+	code << "\tSUB R7, %D 4, R4" << std::endl;
 	if (code_local_arrays.count(name)) {
 		auto range = code_local_arrays.equal_range(name);
 		int length = prev(range.second)->second.second;
 		int loc = prev(range.second)->second.first;
 		for (int i = 0; i < length; ++i) {
-			code << "\tLOAD R0, " << "(R7 +" << loc - i * 4 << ')' << std::endl;
+			code << "\tLOAD R0, " << "(R2-0" << std::hex << std::uppercase
+				 << loc - i * 4 << ')' << std::endl;
 			code << "\tPUSH R0" << std::endl;
 		}
 	}
@@ -112,13 +115,17 @@ void load_array(std::string name) {
 			code << "\t ADD R1, %D 4, R1" << std::endl;
 		}
 	}
+	code << "\tSUB R4, R3, R3" << std::endl;
+	code << "\tLOAD R0, (R3)" << std::endl;
+	code << "\tPUSH R0" << std::endl;
 }
 
-void store_global(std::string name) {
+void store_global_var(std::string name) {
 	code << "\tPOP R0" << std::endl;
 	code << "\tSTORE R0, " << '(' << code_global_variables.at(name) << ')'
 		 << std::endl;
 }
+void store_global_arr(std::string name, int index) {}
 
 void equal_comparison(bool eq) {
 	if (eq) {
@@ -235,6 +242,26 @@ void fill_globals(void) {
 				 << std::endl;
 		} else {
 			code << x.second << std::endl;
+		}
+	}
+	for (auto x : code_global_arrays) {
+		if (global_arr_init.count(x.first)) {
+			if (global_arr_init.at(x.first).size() > 0) {
+				code << x.second.first << "\tDW %D "
+					 << global_arr_init.at(x.first).at(0) << std::endl;
+			} else {
+				code << x.second.first << std::endl;
+			}
+			for (size_t i = 1; i < x.second.second; ++i) {
+				if (global_arr_init.at(x.first).size() > i) {
+					code << "\tDW %D " << global_arr_init.at(x.first).at(i)
+						 << std::endl;
+				} else {
+					code << std::endl;
+				}
+			}
+		} else {
+			code << x.second.first << std::endl;
 		}
 	}
 }

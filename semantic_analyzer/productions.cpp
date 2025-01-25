@@ -29,6 +29,8 @@ std::unordered_multimap<
 bool main_defined = false;
 int block_count = 0;
 bool from_function = false;
+bool indexing_array = false;
+std::string indexed_array = "";
 bool is_minus = false;
 std::stack<bool> calling_function;
 std::stack<std::string> fn_call_name;
@@ -121,12 +123,9 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 				root->type = current_type;
 				root->lhs = false;
 			}
-			load_array(root->children.at(0)->value);
-			// change for arrays
-			// if (!updating_vars.empty()) {
-			// 	vars_to_update.push(root->children.at(0)->value);
-			// 	updating_vars.pop();
-			// }
+			if (indexing_array) {
+				indexed_array = root->children.at(0)->value;
+			}
 		} else if (deepest_block == -1) {
 			return root->semantic_error();
 		}
@@ -164,10 +163,14 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 			}
 			current_global_variable = "";
 		}
-		// if (!updating_vars.empty()) {
-		// 	vars_to_update.push_back(std::to_string(temp));
-		// 	updating_vars.pop();
-		// }
+		if (current_global_array != "") {
+			if (!global_arr_init.count(current_global_variable)) {
+				global_arr_init.emplace(
+					make_pair(current_global_array, std::vector<int>(1, temp)));
+			} else {
+				global_arr_init.at(current_global_array).push_back(temp);
+			}
+		}
 	}
 	// <primarni_izraz> ::= ZNAK
 	// tip ← char
@@ -204,15 +207,15 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 					}
 					current_global_variable = "";
 				}
-				// load_const(code_constants.at(cval));
-				// if (!updating_vars.empty()) {
-				// 	vars_to_update.push_back(std::to_string(cval));
-				// 	updating_vars.pop();
-				// }
-				// if (current_global_variable != "") {
-				// 	store_global(current_global_variable);
-				// 	current_global_variable = "";
-				// }
+				if (current_global_array != "") {
+					if (!global_arr_init.count(current_global_array)) {
+						global_arr_init.emplace(make_pair(
+							current_global_array, std::vector<int>(1, cval)));
+					} else {
+						global_arr_init.at(current_global_array)
+							.push_back(cval);
+					}
+				}
 			}
 		}
 
@@ -294,9 +297,12 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 		// 2. <postfiks_izraz>.tip = niz(X)
 		// 3. provjeri(<izraz>)
 		// 4. <izraz>.tip ∼ int
+		indexing_array = true;
 		if (postfiks_izraz(root->children.at(0))) {
 			return 1;
 		} else {
+			// check this if is updating array ? jednakosni izraz poss
+			indexing_array = false;
 			if (!is_array(root->children.at(0)->type)) {
 				return root->semantic_error();
 			} else {
@@ -311,6 +317,10 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 							remove_array(root->children.at(0)->type);
 						root->type = X;
 						root->lhs = !(is_const(X));
+						// should always execute
+						if (indexed_array != "") {
+							load_array(indexed_array);
+						}
 					}
 				}
 			}
@@ -1125,7 +1135,7 @@ int izraz_pridruzivanja(std::shared_ptr<Node> root) {
 							if (code_local_variables.count(var)) {
 								//
 							} else if (code_global_variables.count(var)) {
-								store_global(var);
+								store_global_var(var);
 							}
 						}
 					}
@@ -2164,7 +2174,6 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 						std::make_pair(block_count,
 									   std::make_pair(current_type, number))));
 					local_names.insert(root->children.at(0)->value);
-
 					if (block_count == 0) {
 						current_global_array = root->children.at(0)->value;
 						std::string next_name = "A";
@@ -2173,12 +2182,9 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 							std::make_pair(root->children.at(0)->value,
 										   std::make_pair(next_name, number)));
 					} else {
-						// code_local_variables.emplace(
-						// 	std::make_pair(root->children.at(0)->value,
-						// 				   code_local_variables.size() * 4));
 						code_local_arrays.emplace(std::make_pair(
 							root->children.at(0)->value,
-							std::make_pair(code_local_arrays.size() * 4,
+							std::make_pair(code_local_arrays.size() * 4 + 4,
 										   number)));
 					}
 				} catch (const std::out_of_range &oor) {
@@ -2263,16 +2269,10 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 					root->children.at(0)->value, function_value));
 				local_names.insert(root->children.at(0)->value);
 			}
-			// std::string current_type = "funkcija(";
-			// for (std::string type : root->children.at(2)->arg_types) {
-			// 	current_type += type;
-			// 	current_type += " -> ";
-			// }
 			std::string current_type = "funkcija(params -> ";
 			current_type += root->inherited_type;
 			current_type += ")";
 		}
-
 	} else {
 		return root->semantic_error();
 	}
@@ -2325,6 +2325,7 @@ int inicijalizator(std::shared_ptr<Node> root) {
 		} else {
 			root->element_count = root->children.at(1)->element_count;
 			root->arg_types = root->children.at(1)->arg_types;
+			current_global_array = "";
 		}
 
 	} else {
