@@ -1802,10 +1802,14 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 									root->children.at(3)->arg_names.at(i);
 								// fixati array;
 								if (is_array(current_type)) {
-									// 	code_local_arrays.emplace(make_pair())
+									// code_local_arrays.emplace(std::make_pair(
+									// 	current_name,
+									// 	std::make_pair((i + 1) * 4, 0)));
+									// trebam zapamtit koliko je odmak na stogu
+									// od
 								} else {
-									code_local_variables.emplace(
-										make_pair(current_name, (i + 1) * 4));
+									code_local_variables.emplace(std::make_pair(
+										current_name, (i + 1) * 4));
 								}
 							}
 

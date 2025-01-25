@@ -67,7 +67,7 @@ void call_fn(std::string name, size_t argc) {
 
 	code << "\tSUB R7, %D 4, R2" << std::endl;
 	code << "\tCALL " << code_functions.at(name) << std::endl;
-	while (cnt--) {
+	if (cnt) {
 		code << "\tSUB R7, %D 4, R7" << std::endl;
 	}
 }
