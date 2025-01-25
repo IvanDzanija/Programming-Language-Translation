@@ -35,3 +35,4 @@ void store_global(std::string name);
 void call_fn(std::string name, size_t);
 void branch_if(void);
 void branch_else(void);
+void equal_comparison(bool eq);

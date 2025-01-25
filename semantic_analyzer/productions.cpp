@@ -32,6 +32,8 @@ bool from_function = false;
 bool is_minus = false;
 std::stack<bool> calling_function;
 std::stack<std::string> fn_call_name;
+std::stack<bool> updating_vars;
+std::vector<std::string> vars_to_update;
 
 int primarni_izraz(std::shared_ptr<Node> root) {
 	// <primarni_izraz> ::= IDN
@@ -59,6 +61,10 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 				root->lhs = true;
 			}
 			load_var(root->children.at(0)->value);
+			if (!updating_vars.empty()) {
+				vars_to_update.push_back(root->children.at(0)->value);
+				updating_vars.pop();
+			}
 		}
 		// check if its a function
 		if (available_functions.count(root->children.at(0)->value)) {
@@ -116,6 +122,11 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 				root->lhs = false;
 			}
 			load_array(root->children.at(0)->value);
+			// change for arrays
+			// if (!updating_vars.empty()) {
+			// 	vars_to_update.push(root->children.at(0)->value);
+			// 	updating_vars.pop();
+			// }
 		} else if (deepest_block == -1) {
 			return root->semantic_error();
 		}
@@ -153,6 +164,10 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 			}
 			current_global_variable = "";
 		}
+		// if (!updating_vars.empty()) {
+		// 	vars_to_update.push_back(std::to_string(temp));
+		// 	updating_vars.pop();
+		// }
 	}
 	// <primarni_izraz> ::= ZNAK
 	// tip ← char
@@ -189,7 +204,11 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 					}
 					current_global_variable = "";
 				}
-				load_const(code_constants.at(cval));
+				// load_const(code_constants.at(cval));
+				// if (!updating_vars.empty()) {
+				// 	vars_to_update.push_back(std::to_string(cval));
+				// 	updating_vars.pop();
+				// }
 				// if (current_global_variable != "") {
 				// 	store_global(current_global_variable);
 				// 	current_global_variable = "";
@@ -814,8 +833,8 @@ int jednakosni_izraz(std::shared_ptr<Node> root) {
 				return root->semantic_error();
 			} else {
 				root->type = "int";
-
 				root->lhs = false;
+				equal_comparison(root->children.at(1)->symbol == "OP_EQ");
 			}
 		}
 	} else {
@@ -1086,6 +1105,7 @@ int izraz_pridruzivanja(std::shared_ptr<Node> root) {
 		// 2. <postfiks_izraz>.l-izraz = 1
 		// 3. provjeri(<izraz_pridruzivanja>)
 		// 4. <izraz_pridruzivanja>.tip ∼ <postfiks_izraz>.tip
+		updating_vars.push(true);
 		if (postfiks_izraz(root->children.at(0))) {
 			return 1;
 		} else {
@@ -1101,6 +1121,13 @@ int izraz_pridruzivanja(std::shared_ptr<Node> root) {
 					} else {
 						root->type = root->children.at(0)->type;
 						root->lhs = false;
+						for (std::string var : vars_to_update) {
+							if (code_local_variables.count(var)) {
+								//
+							} else if (code_global_variables.count(var)) {
+								store_global(var);
+							}
+						}
 					}
 				}
 			}
@@ -2094,8 +2121,6 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 					next_name += std::to_string(code_global_variables.size());
 					code_global_variables.emplace(
 						std::make_pair(root->children.at(0)->value, next_name));
-					// stores global variable after it was changed;
-					// ??
 				} else {
 					code_local_variables.emplace(
 						std::make_pair(root->children.at(0)->value,

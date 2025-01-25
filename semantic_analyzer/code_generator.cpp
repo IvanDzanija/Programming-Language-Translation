@@ -51,9 +51,9 @@ void return_sp(void) {
 }
 
 void branch_if() {
-	code << "\t POP R0" << std::endl;
-	code << "\t CMP R0,0" << std::endl;
-	code << "\t JP_EQ S" << logical_skip << std::endl;
+	code << "\tPOP R0" << std::endl;
+	code << "\tCMP R0,0" << std::endl;
+	code << "\tJP_EQ S" << logical_skip << std::endl;
 }
 void branch_else() { code << "S" << logical_skip++ << std::endl; }
 
@@ -115,8 +115,37 @@ void load_array(std::string name) {
 }
 
 void store_global(std::string name) {
+	code << "\tPOP R0" << std::endl;
 	code << "\tSTORE R0, " << '(' << code_global_variables.at(name) << ')'
 		 << std::endl;
+}
+
+void equal_comparison(bool eq) {
+	if (eq) {
+		code << "\tPOP R0" << std::endl;
+		code << "\tPOP R1" << std::endl;
+		code << "\tCMP R0, R1" << std::endl;
+		code << "\tJP_EQ S" << logical_skip << std::endl;
+		code << "\tMOVE %D 0, R0" << std::endl;
+		code << "\tPUSH R0" << std::endl;
+		code << "\t JP S" << logical_skip + 1 << std::endl;
+		code << "S" << logical_skip++ << std::endl;
+		code << "\tMOVE %D 1, R0" << std::endl;
+		code << "\tPUSH R0" << std::endl;
+		code << "S" << logical_skip++ << std::endl;
+	} else {
+		code << "\tPOP R0" << std::endl;
+		code << "\tPOP R1" << std::endl;
+		code << "\tCMP R0, R1" << std::endl;
+		code << "\tJP_NE S" << logical_skip << std::endl;
+		code << "\tMOVE %D 0, R0" << std::endl;
+		code << "\tPUSH R0" << std::endl;
+		code << "\t JP S" << logical_skip + 1 << std::endl;
+		code << "S" << logical_skip++ << std::endl;
+		code << "\tMOVE %D 1, R0" << std::endl;
+		code << "\tPUSH R0" << std::endl;
+		code << "S" << logical_skip++ << std::endl;
+	}
 }
 
 void load_ret_val(void) { code << "\tPOP R6" << std::endl; }
