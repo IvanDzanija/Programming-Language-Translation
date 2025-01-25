@@ -1345,9 +1345,11 @@ int naredba_grananja(std::shared_ptr<Node> root) {
 		} else if (!implicit_conversion(root->children.at(2)->type, "int")) {
 			return root->semantic_error();
 		} else {
+			branch_if();
 			if (naredba(root->children.at(4))) {
 				return 1;
 			}
+			branch_else();
 		}
 	}
 	// <naredba_grananja> ::= KR_IF L_ZAGRADA <izraz> D_ZAGRADA <naredba>1
@@ -1369,10 +1371,14 @@ int naredba_grananja(std::shared_ptr<Node> root) {
 		} else if (!implicit_conversion(root->children.at(2)->type, "int")) {
 			return root->semantic_error();
 		} else {
+			branch_if();
 			if (naredba(root->children.at(4))) {
 				return 1;
-			} else if (naredba(root->children.at(6))) {
-				return 1;
+			} else {
+				branch_else();
+				if (naredba(root->children.at(6))) {
+					return 1;
+				}
 			}
 		}
 	} else {

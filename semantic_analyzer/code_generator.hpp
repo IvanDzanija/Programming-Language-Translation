@@ -33,3 +33,5 @@ void push_ret_val(void);
 void load_array(std::string name);
 void store_global(std::string name);
 void call_fn(std::string name, size_t);
+void branch_if(void);
+void branch_else(void);

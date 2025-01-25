@@ -50,6 +50,13 @@ void return_sp(void) {
 	code << "\tRET" << std::endl;
 }
 
+void branch_if() {
+	code << "\t POP R0" << std::endl;
+	code << "\t CMP R0,0" << std::endl;
+	code << "\t JP_EQ S" << logical_skip << std::endl;
+}
+void branch_else() { code << "S" << logical_skip++ << std::endl; }
+
 void call_fn(std::string name, size_t argc) {
 	int cnt = argc;
 	if (argc > 0) {
