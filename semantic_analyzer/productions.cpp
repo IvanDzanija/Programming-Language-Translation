@@ -37,7 +37,9 @@ std::stack<std::string> fn_call_name;
 std::stack<bool> updating_vars;
 std::vector<std::string> vars_to_update;
 bool incrementing = false;
-std::string var_to_inc_before = "";
+std::string incrementing_after = "";
+int command_count = 0;
+std::string inc_op = "";
 
 int primarni_izraz(std::shared_ptr<Node> root) {
 	// <primarni_izraz> ::= IDN
@@ -65,13 +67,23 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 				root->lhs = true;
 			}
 			if (incrementing) {
-				var_to_inc_before = root->children.at(0)->value;
+				variable_increment_before(root->children.at(0)->value,
+										  inc_op == "OP_INC");
 				incrementing = false;
+				inc_op = "";
 			} else {
 				load_var(root->children.at(0)->value);
 				if (!updating_vars.empty()) {
 					vars_to_update.push_back(root->children.at(0)->value);
 					updating_vars.pop();
+				}
+				if (incrementing_after != "") {
+					if (increment_after.count(command_count)) {
+						increment_after.at(command_count)
+							.insert(make_pair(root->children.at(0)->value,
+											  command_count));
+					}
+					incrementing_after = "";
 				}
 			}
 		}
@@ -411,6 +423,7 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 			 root->children.at(0)->symbol == "<postfiks_izraz>") {
 		// 1. provjeri(<postfiks_izraz>)
 		// 2. <postfiks_izraz>.l-izraz = 1 i <postfiks_izraz>.tip ∼ int
+		incrementing_after = root->children.at(1)->symbol;
 		if (postfiks_izraz(root->children.at(0))) {
 			return 1;
 		} else {
@@ -422,6 +435,7 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 			} else {
 				root->type = "int";
 				root->lhs = false;
+				incrementing_after = "";
 			}
 		}
 
@@ -492,10 +506,12 @@ int unarni_izraz(std::shared_ptr<Node> root) {
 			 root->children.at(1)->symbol == "<unarni_izraz>") {
 		// 1. provjeri(<unarni_izraz>)
 		// 2. <unarni_izraz>.l-izraz = 1 i <unarni_izraz>.tip ∼ int
+		incrementing = true;
+		inc_op = root->children.at(0)->symbol;
 		if (unarni_izraz(root->children.at(1))) {
 			return 1;
 		} else {
-			incrementing = true;
+
 			if (!root->children.at(1)->lhs) {
 				return root->semantic_error();
 			} else if (!implicit_conversion(root->children.at(1)->type,
@@ -505,10 +521,8 @@ int unarni_izraz(std::shared_ptr<Node> root) {
 				root->type = "int";
 				root->lhs = false;
 				auto it = root->children.at(1);
-				variable_increment_before(var_to_inc_before,
-										  root->children.at(0)->symbol ==
-											  "OP_INC");
 				incrementing = false;
+				inc_op = "";
 			}
 		}
 

@@ -16,6 +16,8 @@ extern std::unordered_multimap<std::string, std::pair<int, int>>
 	code_local_arrays;
 extern std::unordered_map<std::string, int> global_var_init;
 extern std::unordered_map<std::string, std::vector<int>> global_arr_init;
+extern std::unordered_map<int, std::unordered_multimap<std::string, int>>
+	increment_after;
 
 void code_init(void);
 void return_sp(void);

@@ -3,6 +3,8 @@
 #include <fstream>
 #include <ios>
 #include <iostream>
+#include <unordered_map>
+#include <unordered_set>
 
 int logical_skip = 0;
 int local_stack = 0;
@@ -18,6 +20,8 @@ std::unordered_map<int, std::string> code_constants;
 std::unordered_map<std::string, std::string> code_functions;
 std::multimap<std::string, int> code_local_variables;
 std::unordered_multimap<std::string, std::pair<int, int>> code_local_arrays;
+std::unordered_map<int, std::unordered_multimap<std::string, int>>
+	increment_after;
 int loop_counter = 0;
 
 void code_init(void) {
@@ -221,10 +225,11 @@ void variable_increment_before(std::string var, bool plus) {
 	load_var(var);
 	code << "\tPOP R0" << std::endl;
 	if (plus) {
-		code << "\tADD R0, 1, R0";
+		code << "\tADD R0, 1, R0" << std::endl;
+
 		code << "\tPUSH R0" << std::endl;
 	} else {
-		code << "\tSUB R0, 1, R0";
+		code << "\tSUB R0, 1, R0" << std::endl;
 		code << "\tPUSH R0" << std::endl;
 	}
 	if (code_local_variables.count(var)) {
@@ -233,6 +238,28 @@ void variable_increment_before(std::string var, bool plus) {
 		store_global_var(var);
 	}
 	load_var(var);
+}
+void variable_increment_after(int block) {
+	if (!increment_after.count(block)) {
+		std::cout << "NESto krivo " << std::endl;
+	}
+	for (std::pair<std::string, int> var : increment_after.at(block)) {
+		load_var(var.first);
+		if (var.second == -1) {
+			code << "\tSUB R0, %D 1, R0" << std::endl;
+			code << "\tPUSH R0" << std::endl;
+		} else {
+			code << "\tADD R0, %D 1, R0" << std::endl;
+			code << "\tPUSH R0" << std::endl;
+		}
+		if (code_local_variables.count(var.first)) {
+			store_local_var(var.first);
+		} else if (code_global_variables.count(var.first)) {
+			store_local_var(var.first);
+		} else {
+			std::cout << "opt krivo" << std::endl;
+		}
+	}
 }
 
 void while_start() { code << "L" << loop_counter << std::endl; }
@@ -245,8 +272,6 @@ void while_end() {
 	code << "\tJP L" << loop_counter << std::endl;
 	code << "E" << loop_counter++ << std::endl;
 }
-
-void variable_increment_after(void) {}
 
 void load_ret_val(void) { code << "\tPOP R6" << std::endl; }
 void push_ret_val(void) { code << "\tPUSH R6" << std::endl; }
