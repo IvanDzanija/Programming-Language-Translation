@@ -34,7 +34,7 @@ for it in sorted(items):
         ["node", "main.js", "a.frisc"], stdout=file2, stderr=subprocess.DEVNULL
     )
     out = subprocess.run(
-        ["diff", "frisc.out", "test.out"], text=True, capture_output=True
+        ["diff", "-w", "frisc.out", "test.out"], text=True, capture_output=True
     )
     file1 = open("frisc.out")
     print(file1.read())

@@ -16,8 +16,7 @@ extern std::unordered_multimap<std::string, std::pair<int, int>>
 	code_local_arrays;
 extern std::unordered_map<std::string, int> global_var_init;
 extern std::unordered_map<std::string, std::vector<int>> global_arr_init;
-extern std::unordered_map<int, std::unordered_multimap<std::string, int>>
-	increment_after;
+extern std::vector<std::pair<std::string, bool>> increment_after;
 
 void code_init(void);
 void return_sp(void);
@@ -46,6 +45,10 @@ void branch_else(void);
 void equal_comparison(bool eq);
 void relation_comparison(std::string op);
 void variable_increment_before(std::string, bool plus);
+void variable_increment_after(void);
 void while_start(void);
 void while_check(void);
 void while_end(void);
+void operation_div(void);
+void operation_mul(void);
+void operation_mod(void);

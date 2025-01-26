@@ -4,7 +4,6 @@
 #include <ios>
 #include <iostream>
 #include <unordered_map>
-#include <unordered_set>
 
 int logical_skip = 0;
 int local_stack = 0;
@@ -20,9 +19,11 @@ std::unordered_map<int, std::string> code_constants;
 std::unordered_map<std::string, std::string> code_functions;
 std::multimap<std::string, int> code_local_variables;
 std::unordered_multimap<std::string, std::pair<int, int>> code_local_arrays;
-std::unordered_map<int, std::unordered_multimap<std::string, int>>
-	increment_after;
+std::vector<std::pair<std::string, bool>> increment_after;
 int loop_counter = 0;
+int mod_op = 0;
+int div_op = 0;
+int mul_op = 0;
 
 void code_init(void) {
 	code << "\tMOVE 40000, R7" << std::endl;
@@ -120,7 +121,7 @@ void load_array(std::string name) {
 		for (int i = 0; i < length; ++i) {
 			code << "\tLOAD R0, (R1)" << std::endl;
 			code << "\tPUSH R0" << std::endl;
-			code << "\t ADD R1, %D 4, R1" << std::endl;
+			code << "\tADD R1, %D 4, R1" << std::endl;
 		}
 	}
 	code << "\tSUB R4, R3, R3" << std::endl;
@@ -150,7 +151,7 @@ void equal_comparison(bool eq) {
 		code << "\tJP_EQ S" << logical_skip << std::endl;
 		code << "\tMOVE %D 0, R0" << std::endl;
 		code << "\tPUSH R0" << std::endl;
-		code << "\t JP S" << logical_skip + 1 << std::endl;
+		code << "\tJP S" << logical_skip + 1 << std::endl;
 		code << "S" << logical_skip++ << std::endl;
 		code << "\tMOVE %D 1, R0" << std::endl;
 		code << "\tPUSH R0" << std::endl;
@@ -162,7 +163,7 @@ void equal_comparison(bool eq) {
 		code << "\tJP_NE S" << logical_skip << std::endl;
 		code << "\tMOVE %D 0, R0" << std::endl;
 		code << "\tPUSH R0" << std::endl;
-		code << "\t JP S" << logical_skip + 1 << std::endl;
+		code << "\tJP S" << logical_skip + 1 << std::endl;
 		code << "S" << logical_skip++ << std::endl;
 		code << "\tMOVE %D 1, R0" << std::endl;
 		code << "\tPUSH R0" << std::endl;
@@ -239,13 +240,10 @@ void variable_increment_before(std::string var, bool plus) {
 	}
 	load_var(var);
 }
-void variable_increment_after(int block) {
-	if (!increment_after.count(block)) {
-		std::cout << "NESto krivo " << std::endl;
-	}
-	for (std::pair<std::string, int> var : increment_after.at(block)) {
+void variable_increment_after() {
+	for (std::pair<std::string, int> var : increment_after) {
 		load_var(var.first);
-		if (var.second == -1) {
+		if (var.second == false) {
 			code << "\tSUB R0, %D 1, R0" << std::endl;
 			code << "\tPUSH R0" << std::endl;
 		} else {
@@ -255,11 +253,10 @@ void variable_increment_after(int block) {
 		if (code_local_variables.count(var.first)) {
 			store_local_var(var.first);
 		} else if (code_global_variables.count(var.first)) {
-			store_local_var(var.first);
-		} else {
-			std::cout << "opt krivo" << std::endl;
+			store_global_var(var.first);
 		}
 	}
+	increment_after.clear();
 }
 
 void while_start() { code << "L" << loop_counter << std::endl; }
@@ -401,3 +398,19 @@ void fill_consts(void) {
 	}
 	code.close();
 }
+
+void operation_mod(void) {
+	code << "MD" << mod_op << "\tPOP R0" << std::endl; // second operand
+	code << "\tPOP R1" << std::endl;				   // first operand
+	code << "\tCMP R1, R0" << std::endl;
+	code << "\tJP_SLT MD" << mod_op + 1 << std::endl;
+	code << "\tSUB R1, R0, R1" << std::endl;
+	code << "\tPUSH R1" << std::endl;
+	code << "\tPUSH R0" << std::endl;
+	code << "\tJP MD" << mod_op << std::endl;
+	code << "MD" << ++mod_op << "\tPUSH R1" << std::endl;
+}
+
+void operation_mul(void) {}
+
+void operation_div(void) {}

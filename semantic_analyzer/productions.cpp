@@ -78,11 +78,9 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 					updating_vars.pop();
 				}
 				if (incrementing_after != "") {
-					if (increment_after.count(command_count)) {
-						increment_after.at(command_count)
-							.insert(make_pair(root->children.at(0)->value,
-											  command_count));
-					}
+					increment_after.push_back(
+						make_pair(root->children.at(0)->value,
+								  incrementing_after == "OP_INC"));
 					incrementing_after = "";
 				}
 			}
@@ -237,7 +235,6 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 				}
 			}
 		}
-
 	}
 	// <primarni_izraz> ::= NIZ_ZNAKOVA
 	// tip ← niz(const(char))
@@ -710,8 +707,14 @@ int multiplikativni_izraz(std::shared_ptr<Node> root) {
 				return root->semantic_error();
 			} else {
 				root->type = "int";
-
 				root->lhs = false;
+				if (root->children.at(1)->symbol == "OP_MOD") {
+					operation_mod();
+				} else if (root->children.at(1)->symbol == "OP_PUTA") {
+					operation_mul();
+				} else {
+					operation_div();
+				}
 			}
 		}
 	} else {
@@ -1395,6 +1398,7 @@ int izraz_naredba(std::shared_ptr<Node> root) {
 	} else {
 		return root->semantic_error();
 	}
+	variable_increment_after();
 	return 0;
 }
 
@@ -1590,6 +1594,7 @@ int naredba_skoka(std::shared_ptr<Node> root) {
 	} else {
 		return root->semantic_error();
 	}
+	variable_increment_after();
 	return 0;
 }
 
@@ -2034,6 +2039,7 @@ int deklaracija(std::shared_ptr<Node> root) {
 		return root->semantic_error();
 	}
 	return 0;
+	variable_increment_after();
 }
 
 int lista_init_deklaratora(std::shared_ptr<Node> root) {
