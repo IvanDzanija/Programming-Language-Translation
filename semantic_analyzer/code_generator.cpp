@@ -1,5 +1,7 @@
 #include "code_generator.hpp"
+#include <cstdint>
 #include <fstream>
+#include <ios>
 #include <iostream>
 
 int logical_skip = 0;
@@ -16,6 +18,7 @@ std::unordered_map<int, std::string> code_constants;
 std::unordered_map<std::string, std::string> code_functions;
 std::multimap<std::string, int> code_local_variables;
 std::unordered_multimap<std::string, std::pair<int, int>> code_local_arrays;
+int loop_counter = 0;
 
 void code_init(void) {
 	code << "\tMOVE 40000, R7" << std::endl;
@@ -103,6 +106,7 @@ void load_array(std::string name) {
 				 << loc - i * 4 << ')' << std::endl;
 			code << "\tPUSH R0" << std::endl;
 		}
+		code << std::dec << std::endl;
 	}
 	// saved in memory -> moving down
 	else if (code_global_arrays.count(name)) {
@@ -124,6 +128,13 @@ void store_global_var(std::string name) {
 	code << "\tPOP R0" << std::endl;
 	code << "\tSTORE R0, " << '(' << code_global_variables.at(name) << ')'
 		 << std::endl;
+}
+void store_local_var(std::string name) {
+	code << "\tPOP R0" << std::endl;
+	code << "\tSTORE R0, " << "(R2-0" << std::hex << std::uppercase
+		 << std::prev(code_local_variables.equal_range(name).second)->second
+		 << ')' << std::endl;
+	code << std::dec << std::endl;
 }
 void store_global_arr(std::string name, int index) {}
 
@@ -154,6 +165,88 @@ void equal_comparison(bool eq) {
 		code << "S" << logical_skip++ << std::endl;
 	}
 }
+void relation_comparison(std::string op) {
+	if (op == "OP_LT") {
+		code << "\tPOP R0" << std::endl;
+		code << "\tPOP R1" << std::endl;
+		code << "\tCMP R1, R0" << std::endl;
+		code << "\tJP_SLT S" << logical_skip << std::endl;
+		code << "\tMOVE %D 0, R0" << std::endl;
+		code << "\tPUSH R0" << std::endl;
+		code << "\tJP S" << logical_skip + 1 << std::endl;
+		code << "S" << logical_skip++ << std::endl;
+		code << "\tMOVE %D 1, R0" << std::endl;
+		code << "\tPUSH R0" << std::endl;
+		code << "S" << logical_skip++ << std::endl;
+	} else if (op == "OP_GT") {
+		code << "\tPOP R0" << std::endl;
+		code << "\tPOP R1" << std::endl;
+		code << "\tCMP R1, R0" << std::endl;
+		code << "\tJP_SGT S" << logical_skip << std::endl;
+		code << "\tMOVE %D 0, R0" << std::endl;
+		code << "\tPUSH R0" << std::endl;
+		code << "\tJP S" << logical_skip + 1 << std::endl;
+		code << "S" << logical_skip++ << std::endl;
+		code << "\tMOVE %D 1, R0" << std::endl;
+		code << "\tPUSH R0" << std::endl;
+		code << "S" << logical_skip++ << std::endl;
+	} else if (op == "OP_LTE") {
+		code << "\tPOP R0" << std::endl;
+		code << "\tPOP R1" << std::endl;
+		code << "\tCMP R1, R0" << std::endl;
+		code << "\tJP_SLE S" << logical_skip << std::endl;
+		code << "\tMOVE %D 0, R0" << std::endl;
+		code << "\tPUSH R0" << std::endl;
+		code << "\tJP S" << logical_skip + 1 << std::endl;
+		code << "S" << logical_skip++ << std::endl;
+		code << "\tMOVE %D 1, R0" << std::endl;
+		code << "\tPUSH R0" << std::endl;
+		code << "S" << logical_skip++ << std::endl;
+	} else if (op == "OP_GTE") {
+		code << "\tPOP R0" << std::endl;
+		code << "\tPOP R1" << std::endl;
+		code << "\tCMP R1, R0" << std::endl;
+		code << "\tJP_SGE S" << logical_skip << std::endl;
+		code << "\tMOVE %D 0, R0" << std::endl;
+		code << "\tPUSH R0" << std::endl;
+		code << "\tJP S" << logical_skip + 1 << std::endl;
+		code << "S" << logical_skip++ << std::endl;
+		code << "\tMOVE %D 1, R0" << std::endl;
+		code << "\tPUSH R0" << std::endl;
+		code << "S" << logical_skip++ << std::endl;
+	}
+}
+
+void variable_increment_before(std::string var, bool plus) {
+	load_var(var);
+	code << "\tPOP R0" << std::endl;
+	if (plus) {
+		code << "\tADD R0, 1, R0";
+		code << "\tPUSH R0" << std::endl;
+	} else {
+		code << "\tSUB R0, 1, R0";
+		code << "\tPUSH R0" << std::endl;
+	}
+	if (code_local_variables.count(var)) {
+		store_local_var(var);
+	} else if (code_global_variables.count(var)) {
+		store_global_var(var);
+	}
+	load_var(var);
+}
+
+void while_start() { code << "L" << loop_counter << std::endl; }
+void while_check() {
+	code << "\tPOP R0" << std::endl;
+	code << "\tCMP R0, 0" << std::endl;
+	code << "\tJP_EQ E" << loop_counter << std::endl;
+}
+void while_end() {
+	code << "\tJP L" << loop_counter << std::endl;
+	code << "E" << loop_counter++ << std::endl;
+}
+
+void variable_increment_after(void) {}
 
 void load_ret_val(void) { code << "\tPOP R6" << std::endl; }
 void push_ret_val(void) { code << "\tPUSH R6" << std::endl; }

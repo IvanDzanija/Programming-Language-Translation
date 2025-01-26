@@ -36,6 +36,8 @@ std::stack<bool> calling_function;
 std::stack<std::string> fn_call_name;
 std::stack<bool> updating_vars;
 std::vector<std::string> vars_to_update;
+bool incrementing = false;
+std::string var_to_inc_before = "";
 
 int primarni_izraz(std::shared_ptr<Node> root) {
 	// <primarni_izraz> ::= IDN
@@ -62,10 +64,15 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 			} else {
 				root->lhs = true;
 			}
-			load_var(root->children.at(0)->value);
-			if (!updating_vars.empty()) {
-				vars_to_update.push_back(root->children.at(0)->value);
-				updating_vars.pop();
+			if (incrementing) {
+				var_to_inc_before = root->children.at(0)->value;
+				incrementing = false;
+			} else {
+				load_var(root->children.at(0)->value);
+				if (!updating_vars.empty()) {
+					vars_to_update.push_back(root->children.at(0)->value);
+					updating_vars.pop();
+				}
 			}
 		}
 		// check if its a function
@@ -488,6 +495,7 @@ int unarni_izraz(std::shared_ptr<Node> root) {
 		if (unarni_izraz(root->children.at(1))) {
 			return 1;
 		} else {
+			incrementing = true;
 			if (!root->children.at(1)->lhs) {
 				return root->semantic_error();
 			} else if (!implicit_conversion(root->children.at(1)->type,
@@ -495,8 +503,12 @@ int unarni_izraz(std::shared_ptr<Node> root) {
 				return root->semantic_error();
 			} else {
 				root->type = "int";
-
 				root->lhs = false;
+				auto it = root->children.at(1);
+				variable_increment_before(var_to_inc_before,
+										  root->children.at(0)->symbol ==
+											  "OP_INC");
+				incrementing = false;
 			}
 		}
 
@@ -794,8 +806,8 @@ int odnosni_izraz(std::shared_ptr<Node> root) {
 				return root->semantic_error();
 			} else {
 				root->type = "int";
-
 				root->lhs = false;
+				relation_comparison(root->children.at(1)->symbol);
 			}
 		}
 	} else {
@@ -1133,11 +1145,12 @@ int izraz_pridruzivanja(std::shared_ptr<Node> root) {
 						root->lhs = false;
 						for (std::string var : vars_to_update) {
 							if (code_local_variables.count(var)) {
-								//
+								store_local_var(var);
 							} else if (code_global_variables.count(var)) {
 								store_global_var(var);
 							}
 						}
+						vars_to_update.clear();
 					}
 				}
 			}
@@ -1436,13 +1449,17 @@ int naredba_petlje(std::shared_ptr<Node> root) {
 		// 1. provjeri(<izraz>)
 		// 2. <izraz>.tip ∼ int
 		// 3. provjeri(<naredba>)
+		while_start();
 		if (izraz(root->children.at(2))) {
 			return 1;
 		} else if (!implicit_conversion(root->children.at(2)->type, "int")) {
 			return root->semantic_error();
 		} else {
+			while_check();
 			if (naredba(root->children.at(4))) {
 				return 1;
+			} else {
+				while_end();
 			}
 		}
 	}
