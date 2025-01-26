@@ -20,10 +20,13 @@ std::unordered_map<std::string, std::string> code_functions;
 std::multimap<std::string, int> code_local_variables;
 std::unordered_multimap<std::string, std::pair<int, int>> code_local_arrays;
 std::vector<std::pair<std::string, bool>> increment_after;
+std::unordered_map<int, std::vector<std::pair<std::string, int>>>
+	for_var_update;
 int loop_counter = 0;
 int mod_op = 0;
 int div_op = 0;
 int mul_op = 0;
+int for_loop_skip = 0;
 
 void code_init(void) {
 	code << "\tMOVE 40000, R7" << std::endl;
@@ -268,6 +271,37 @@ void while_check() {
 void while_end() {
 	code << "\tJP L" << loop_counter << std::endl;
 	code << "E" << loop_counter++ << std::endl;
+}
+void forc_start() {
+	code << "L" << loop_counter << std::endl;
+	code << "\tMOVE %D 0, R5" << std::endl;
+}
+
+void forc_check() {
+	code << "\tPOP R0" << std::endl;
+	code << "\tCMP R0, 0" << std::endl;
+	code << "\tJP_EQ E" << loop_counter << std::endl;
+}
+void forc_skip_first() {
+	code << "I" << for_loop_skip << std::endl;
+	code << "\tCMP R5, 0" << std::endl;
+	code << "\tJP_EQ K" << for_loop_skip << std::endl;
+}
+void forc_skip_second() {
+	code << "\tCMP R5, 1" << std::endl;
+	code << "\tJP_EQ J" << for_loop_skip << std::endl;
+	code << "\tCMP R5, 2" << std::endl;
+	code << "\tJP_EQ AE" << for_loop_skip << std::endl;
+	code << "K" << for_loop_skip << std::endl;
+}
+
+void forc_end() {
+	code << "\tMOVE %D 1, R5" << std::endl;
+	code << "\tJP I" << for_loop_skip << std::endl;
+	code << "J" << for_loop_skip << "\tJP L" << loop_counter << std::endl;
+	code << "E" << loop_counter++ << "\tMOVE %D 2, R5" << std::endl;
+	code << "\tJP I" << for_loop_skip << std::endl;
+	code << "AE" << for_loop_skip++ << std::endl;
 }
 
 void load_ret_val(void) { code << "\tPOP R6" << std::endl; }
