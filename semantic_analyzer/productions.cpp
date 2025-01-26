@@ -1037,6 +1037,7 @@ int log_i_izraz(std::shared_ptr<Node> root) {
 		} else if (!implicit_conversion(root->children.at(0)->type, "int")) {
 			return root->semantic_error();
 		} else {
+			logical_start(1);
 			if (bin_ili_izraz(root->children.at(2))) {
 				return 1;
 			} else if (!implicit_conversion(root->children.at(2)->type,
@@ -1045,7 +1046,8 @@ int log_i_izraz(std::shared_ptr<Node> root) {
 			} else {
 				root->type = "int";
 				root->lhs = false;
-				logical_operation(1);
+				logical_check(1);
+				logical_end();
 			}
 		}
 	} else {
@@ -1084,6 +1086,7 @@ int log_ili_izraz(std::shared_ptr<Node> root) {
 		} else if (!implicit_conversion(root->children.at(0)->type, "int")) {
 			return root->semantic_error();
 		} else {
+			logical_start(2);
 			if (log_i_izraz(root->children.at(2))) {
 				return 1;
 			} else if (!implicit_conversion(root->children.at(2)->type,
@@ -1092,7 +1095,8 @@ int log_ili_izraz(std::shared_ptr<Node> root) {
 			} else {
 				root->type = "int";
 				root->lhs = false;
-				logical_operation(2);
+				logical_check(2);
+				logical_end();
 			}
 		}
 	} else {

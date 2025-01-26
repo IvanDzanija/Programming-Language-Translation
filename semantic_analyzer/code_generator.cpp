@@ -300,28 +300,39 @@ void bitwise_operation(uint8_t op) {
 		code << "\tPUSH R0" << std::endl;
 	}
 }
-
-void logical_operation(uint8_t op) {
+void logical_start(uint8_t op) {
 	if (op == 1) {
 		// &&
 		code << "\tPOP R0" << std::endl;
 		code << "\tCMP R0, 0" << std::endl;
 		code << "\tJP_EQ S" << logical_skip << std::endl;
-		code << "\tPOP R1" << std::endl;
-		code << "\tCMP R1, 0" << std::endl;
-		code << "\tJP_EQ S" << logical_skip + 1 << std::endl;
-		code << "S" << logical_skip++ << "\tAND R0, R1, R0 " << std::endl;
 		code << "\tPUSH R0" << std::endl;
 	} else {
 		// ||
 		code << "\tPOP R0" << std::endl;
 		code << "\tCMP R0, 0" << std::endl;
 		code << "\tJP_NE S" << logical_skip << std::endl;
-		code << "\tPOP R1" << std::endl;
-		code << logical_skip++ << "\tOR R0, R1, R0" << std::endl;
 		code << "\tPUSH R0" << std::endl;
 	}
 }
+void logical_check(uint8_t op) {
+	if (op == 1) {
+		// &&
+		code << "\tPOP R0" << std::endl;
+		code << "\tPOP R1" << std::endl;
+		code << "\tAND R0, R1, R0" << std::endl;
+		code << "\tPUSH R0" << std::endl;
+
+	} else {
+		// ||
+		code << "\tPOP R0" << std::endl;
+		code << "\tPOP R1" << std::endl;
+		code << "\tOR R0, R1, R0" << std::endl;
+		code << "\tPUSH R0" << std::endl;
+	}
+}
+
+void logical_end(void) { code << "S" << logical_skip++ << std::endl; }
 
 void load_const(std::string var) {
 	code << "\tLOAD R0, " << '(' << var << ')' << std::endl;
