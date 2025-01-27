@@ -1,4 +1,4 @@
-#include "code_generator.hpp"
+#include "../code_generator/code_generator.hpp"
 #include "helper_functions.hpp"
 #include "productions.hpp"
 #include <memory>
