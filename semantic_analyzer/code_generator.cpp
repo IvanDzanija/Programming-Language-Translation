@@ -122,6 +122,9 @@ void call_fn(std::string name, size_t argc) {
 }
 void load_var(std::string name) {
 	// first check local defs!
+	// for (auto x : code_local_variables) {
+	// 	std::cout << x.first << ' ' << x.second << std::endl;
+	// }
 	code << std::dec;
 	if (code_local_variables.count(name)) {
 		auto range = code_local_variables.equal_range(name);
@@ -155,7 +158,6 @@ void load_array(std::string name) {
 	}
 	// saved in memory -> moving down
 	else if (code_global_arrays.count(name)) {
-		std::cout << "ovde " << std::endl;
 		auto range = code_global_arrays.equal_range(name);
 		std::string loc = std::prev(range.second)->second.first;
 		code << "\tMOVE " << loc << ", R1" << std::endl;
@@ -210,7 +212,7 @@ void store_func_arr(std::string name, int index) {
 	code << "\tMOVE %D 4, R0" << std::endl;
 	code << "\tPUSH R0" << std::endl;
 	operation_mul();
-	code << "\t POP R0" << std::endl;
+	code << "\tPOP R0" << std::endl;
 	code << "\tLOAD R1, " << "(R2-0" << std::hex << std::uppercase
 		 << function_arrays.at(name) << ')' << std::endl;
 	code << std::dec;

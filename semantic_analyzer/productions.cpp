@@ -47,6 +47,7 @@ std::vector<std::pair<std::string, int>> arrs_to_update;
 bool sending_params;
 
 bool incrementing = false;
+
 std::string incrementing_after = "";
 int command_count = 0;
 std::string inc_op = "";
@@ -76,6 +77,7 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 			} else {
 				root->lhs = true;
 			}
+
 			if (code_local_variables.count(root->children.at(0)->value)) {
 				if (incrementing) {
 					variable_increment_before(root->children.at(0)->value,
@@ -84,8 +86,6 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 					inc_op = "";
 				} else {
 					if (code_local_variables.count(
-							root->children.at(0)->value) ||
-						code_global_variables.count(
 							root->children.at(0)->value)) {
 						load_var(root->children.at(0)->value);
 						if (!updating_vars.empty()) {
@@ -102,12 +102,14 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 					}
 				}
 			} else if (function_arrays.count(root->children.at(0)->value)) {
+				if (indexing_array) {
+					indexed_array = root->children.at(0)->value;
+				}
 				if (!updating_arrs.empty()) {
-					std::cout << root->children.at(0)->value << std::endl;
 					arrs_to_update.push_back(
 						std::make_pair(root->children.at(0)->value, 0));
+					updating_arrs.pop();
 				}
-				updating_arrs.pop();
 			} else if (code_global_variables.count(
 						   root->children.at(0)->value)) {
 				if (incrementing) {
@@ -116,9 +118,7 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 					incrementing = false;
 					inc_op = "";
 				} else {
-					if (code_local_variables.count(
-							root->children.at(0)->value) ||
-						code_global_variables.count(
+					if (code_global_variables.count(
 							root->children.at(0)->value)) {
 						load_var(root->children.at(0)->value);
 						if (!updating_vars.empty()) {
@@ -202,8 +202,8 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 				if (!updating_arrs.empty()) {
 					arrs_to_update.push_back(
 						std::make_pair(root->children.at(0)->value, 0));
+					updating_arrs.pop();
 				}
-				updating_arrs.pop();
 			}
 
 		} else if (deepest_block == -1) {
@@ -245,7 +245,7 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 			current_global_variable = "";
 		}
 		if (current_global_array != "") {
-			if (!global_arr_init.count(current_global_variable)) {
+			if (!global_arr_init.count(current_global_array)) {
 				global_arr_init.emplace(
 					make_pair(current_global_array, std::vector<int>(1, temp)));
 			} else {
@@ -356,7 +356,7 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<primarni_izraz>") {
 		// 1. provjeri(<primarni_izraz>)
-		if (!updating.empty() && indexing_array) {
+		if (!updating.empty() && indexing_array == true) {
 			updating_arrs.push(true);
 			indexing_array = false;
 		} else if (!updating.empty()) {
@@ -391,6 +391,7 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 			if (!is_array(root->children.at(0)->type)) {
 				return root->semantic_error();
 			} else {
+				indexing_array = false;
 				if (izraz(root->children.at(2))) {
 					return 1;
 				} else {
@@ -405,6 +406,7 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 						if (indexed_array != "") {
 							load_array(indexed_array);
 						}
+						indexing_array = false;
 					}
 				}
 			}
@@ -1243,8 +1245,8 @@ int izraz_pridruzivanja(std::shared_ptr<Node> root) {
 							}
 						}
 						vars_to_update.clear();
+
 						for (std::pair<std::string, int> arr : arrs_to_update) {
-							std::cout << arr.first << std::endl;
 							if (function_arrays.count(arr.first)) {
 								store_func_arr(arr.first, arr.second);
 							} else if (code_global_arrays.count(arr.first)) {
@@ -1386,6 +1388,7 @@ int slozena_naredba(std::shared_ptr<Node> root) {
 	available_arrays.swap(new_available_arrays);
 	available_functions.swap(new_available_functions);
 	available_variables.swap(new_available_variables);
+	--block_count;
 	return 0;
 }
 
@@ -2204,7 +2207,6 @@ int init_deklarator(std::shared_ptr<Node> root) {
 				return 1;
 			}
 			current_global_array = "";
-
 			if (is_array(root->children.at(0)->type)) {
 				if (!(root->children.at(2)->element_count <=
 					  root->children.at(0)->element_count)) {
@@ -2264,9 +2266,11 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 					code_global_variables.emplace(
 						std::make_pair(root->children.at(0)->value, next_name));
 				} else {
-					code_local_variables.emplace(
-						std::make_pair(root->children.at(0)->value,
-									   code_local_variables.size() * 4 + 4));
+					code_local_variables.emplace(std::make_pair(
+						root->children.at(0)->value,
+						(code_local_variables.size() + function_arrays.size()) *
+								4 +
+							4));
 				}
 			}
 		}
