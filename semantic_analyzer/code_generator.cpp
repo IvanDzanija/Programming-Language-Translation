@@ -13,15 +13,14 @@ std::unordered_map<std::string, std::string>
 std::unordered_map<std::string, int> global_var_init;
 std::unordered_map<std::string, std::vector<int>> global_arr_init;
 std::unordered_map<std::string, std::pair<std::string, int>> code_global_arrays;
-std::string current_global_variable;
-std::string current_global_array;
 std::unordered_map<int, std::string> code_constants;
 std::unordered_map<std::string, std::string> code_functions;
 std::multimap<std::string, int> code_local_variables;
-std::unordered_multimap<std::string, std::pair<int, int>> code_local_arrays;
+std::multimap<std::string, std::pair<int, int>> code_local_arrays;
 std::vector<std::pair<std::string, bool>> increment_after;
 std::unordered_map<int, std::vector<std::pair<std::string, int>>>
 	for_var_update;
+std::unordered_map<std::string, int> function_arrays;
 int loop_counter = 0;
 int mod_op = 0;
 int div_op = 0;
@@ -67,6 +66,33 @@ void branch_if() {
 	code << "\tJP_EQ S" << logical_skip << std::endl;
 }
 void branch_else() { code << "S" << logical_skip++ << std::endl; }
+void operation_mod(void) {
+	code << "MD" << mod_op << "\tPOP R0" << std::endl; // second operand
+	code << "\tPOP R1" << std::endl;				   // first operand
+	code << "\tCMP R1, R0" << std::endl;
+	code << "\tJP_SLT MD" << mod_op + 1 << std::endl;
+	code << "\tSUB R1, R0, R1" << std::endl;
+	code << "\tPUSH R1" << std::endl;
+	code << "\tPUSH R0" << std::endl;
+	code << "\tJP MD" << mod_op << std::endl;
+	code << "MD" << ++mod_op << "\tPUSH R1" << std::endl;
+	++mod_op;
+}
+
+void operation_mul(void) {
+	code << "\t MOVE 0, R4" << std::endl;
+	code << "ML" << mul_op << "\tPOP R0" << std::endl; // second operand
+	code << "\tPOP R1" << std::endl;				   // first operand
+	code << "\tCMP R0, 0" << std::endl;
+	code << "\tJP_EQ ML" << mul_op + 1 << std::endl;
+	code << "\tADD R4, R1, R4" << std::endl;
+	code << "\tSUB R0, 1, R0" << std::endl;
+	code << "\tPUSH R1" << std::endl;
+	code << "\tPUSH R0" << std::endl;
+	code << "\tJP ML" << mul_op << std::endl;
+	code << "ML" << ++mul_op << "\tPUSH R4" << std::endl;
+	++mul_op;
+}
 
 void call_fn(std::string name, size_t argc) {
 	int cnt = argc;
@@ -144,7 +170,53 @@ void store_local_var(std::string name) {
 		 << ')' << std::endl;
 	code << std::dec << std::endl;
 }
-void store_global_arr(std::string name, int index) {}
+void store_global_arr(std::string name, int index) {
+	code << "\tPOP R3" << std::endl;
+	code << "\tMOVE %D 4, R0" << std::endl;
+	code << "\tPUSH R0" << std::endl;
+	operation_mul();
+	code << "\tPOP R0" << std::endl;
+	code << "\tMOVE " << code_global_arrays.at(name).first << ", R1"
+		 << std::endl;
+	code << "\tADD R1, R0, R1" << std::endl;
+	code << "\tSTORE R3, (R1)" << std::endl;
+	code << std::dec;
+}
+
+void store_local_arr(std::string name, int index) {
+	code << "\tPOP R3" << std::endl;
+	code << "\tMOVE %D 4, R0" << std::endl;
+	code << "\tPUSH R0" << std::endl;
+	operation_mul();
+	code << "\tPOP R0" << std::endl;
+	code << "\tSUB R2, %D "
+		 << std::prev(code_local_arrays.equal_range(name).second)->second.first
+		 << ", R1" << std::endl;
+	code << "\tSUB R1, R0, R1" << std::endl;
+	code << "\tSTORE R3, (R1)" << std::endl;
+	code << std::dec;
+}
+
+void store_func_arr(std::string name, int index) {
+	code << "\tPOP R3" << std::endl;
+	code << "\tMOVE %D 4, R0" << std::endl;
+	code << "\tPUSH R0" << std::endl;
+	operation_mul();
+	code << "\t POP R0" << std::endl;
+	auto range = function_arrays.equal_range(name);
+	code << "\tLOAD R1, " << "(R2-0" << std::hex << std::uppercase
+		 << std::prev(range.second)->second << ')' << std::endl;
+	code << std::dec;
+	code << "\tSUB R1, R0, R1" << std::endl;
+	code << "\tSTORE R3, (R1)" << std::endl;
+}
+
+void send_arr(std::string name) {
+	code << "\tSUB R2, %D "
+		 << std::prev(code_local_arrays.equal_range(name).second)->second.first
+		 << ", R0" << std::endl;
+	code << "\tPUSH R0" << std::endl;
+}
 
 void equal_comparison(bool eq) {
 	if (eq) {
@@ -432,19 +504,5 @@ void fill_consts(void) {
 	}
 	code.close();
 }
-
-void operation_mod(void) {
-	code << "MD" << mod_op << "\tPOP R0" << std::endl; // second operand
-	code << "\tPOP R1" << std::endl;				   // first operand
-	code << "\tCMP R1, R0" << std::endl;
-	code << "\tJP_SLT MD" << mod_op + 1 << std::endl;
-	code << "\tSUB R1, R0, R1" << std::endl;
-	code << "\tPUSH R1" << std::endl;
-	code << "\tPUSH R0" << std::endl;
-	code << "\tJP MD" << mod_op << std::endl;
-	code << "MD" << ++mod_op << "\tPUSH R1" << std::endl;
-}
-
-void operation_mul(void) {}
 
 void operation_div(void) {}

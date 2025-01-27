@@ -5,20 +5,19 @@
 #include <vector>
 
 extern std::unordered_map<std::string, std::string> code_global_variables;
-extern std::string current_global_variable;
-extern std::string current_global_array;
 extern std::unordered_map<std::string, std::pair<std::string, int>>
 	code_global_arrays;
 extern std::unordered_map<int, std::string> code_constants;
 extern std::unordered_map<std::string, std::string> code_functions;
 extern std::multimap<std::string, int> code_local_variables;
-extern std::unordered_multimap<std::string, std::pair<int, int>>
-	code_local_arrays;
+extern std::multimap<std::string, std::pair<int, int>>
+	code_local_arrays; // name -> location, size
 extern std::unordered_map<std::string, int> global_var_init;
 extern std::unordered_map<std::string, std::vector<int>> global_arr_init;
 extern std::vector<std::pair<std::string, bool>> increment_after;
 extern std::unordered_map<int, std::vector<std::pair<std::string, int>>>
 	for_var_update;
+extern std::unordered_map<std::string, int> function_arrays;
 
 void code_init(void);
 void return_sp(void);
@@ -41,6 +40,8 @@ void push_ret_val(void);
 void store_global_var(std::string name);
 void store_local_var(std::string name);
 void store_global_arr(std::string name, int index);
+void store_local_arr(std::string name, int index);
+void store_func_arr(std::string name, int index);
 void call_fn(std::string name, size_t);
 void branch_if(void);
 void branch_else(void);
@@ -59,3 +60,4 @@ void forc_skip_second(void);
 void operation_div(void);
 void operation_mul(void);
 void operation_mod(void);
+void send_arr(std::string name);

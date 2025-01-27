@@ -28,14 +28,24 @@ std::unordered_multimap<
 	available_functions;
 bool main_defined = false;
 int block_count = 0;
-bool from_function = false;
-bool indexing_array = false;
-std::string indexed_array = "";
 bool is_minus = false;
+bool from_function = false;
+
+std::string current_global_variable;
+std::string current_global_array;
+
 std::stack<bool> calling_function;
 std::stack<std::string> fn_call_name;
+
+std::string indexed_array = "";
+bool indexing_array = false;
+std::stack<bool> updating;
 std::stack<bool> updating_vars;
+std::stack<bool> updating_arrs;
 std::vector<std::string> vars_to_update;
+std::vector<std::pair<std::string, int>> arrs_to_update;
+bool sending_params;
+
 bool incrementing = false;
 std::string incrementing_after = "";
 int command_count = 0;
@@ -66,12 +76,15 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 			} else {
 				root->lhs = true;
 			}
-			if (incrementing) {
-				variable_increment_before(root->children.at(0)->value,
-										  inc_op == "OP_INC");
-				incrementing = false;
-				inc_op = "";
-			} else {
+		}
+		if (incrementing) {
+			variable_increment_before(root->children.at(0)->value,
+									  inc_op == "OP_INC");
+			incrementing = false;
+			inc_op = "";
+		} else {
+			if (code_local_variables.count(root->children.at(0)->value) ||
+				code_global_variables.count(root->children.at(0)->value)) {
 				load_var(root->children.at(0)->value);
 				if (!updating_vars.empty()) {
 					vars_to_update.push_back(root->children.at(0)->value);
@@ -143,9 +156,30 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 			if (indexing_array) {
 				indexed_array = root->children.at(0)->value;
 			}
+			if (code_functions.count(root->children.at(0)->value)) {
+				if (!updating_arrs.empty()) {
+					arrs_to_update.push_back(
+						std::make_pair(root->children.at(0)->value, 0));
+				}
+				updating_arrs.pop();
+			} else if (code_global_arrays.count(root->children.at(0)->value)) {
+				if (!updating_arrs.empty()) {
+					arrs_to_update.push_back(
+						std::make_pair(root->children.at(0)->value, 0));
+				}
+				updating_arrs.pop();
+			} else if (code_local_arrays.count(root->children.at(0)->value)) {
+				if (!updating_arrs.empty()) {
+					arrs_to_update.push_back(
+						std::make_pair(root->children.at(0)->value, 0));
+				}
+				updating_arrs.pop();
+				send_arr(root->children.at(0)->value);
+			}
 		} else if (deepest_block == -1) {
 			return root->semantic_error();
 		}
+
 	}
 	// <primarni_izraz> ::= BROJ
 	// tip ← int
@@ -291,6 +325,12 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 	if (root->children.size() == 1 &&
 		root->children.at(0)->symbol == "<primarni_izraz>") {
 		// 1. provjeri(<primarni_izraz>)
+		if (!updating.empty() && indexing_array) {
+			updating_arrs.push(true);
+			indexing_array = false;
+		} else if (!updating.empty()) {
+			updating_vars.push(true);
+		}
 		if (primarni_izraz(root->children.at(0))) {
 			return 1;
 		} else {
@@ -317,8 +357,6 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 		if (postfiks_izraz(root->children.at(0))) {
 			return 1;
 		} else {
-			// check this if is updating array ? jednakosni izraz poss
-			indexing_array = false;
 			if (!is_array(root->children.at(0)->type)) {
 				return root->semantic_error();
 			} else {
@@ -333,7 +371,6 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 							remove_array(root->children.at(0)->type);
 						root->type = X;
 						root->lhs = !(is_const(X));
-						// should always execute
 						if (indexed_array != "") {
 							load_array(indexed_array);
 						}
@@ -391,6 +428,7 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 		if (postfiks_izraz(root->children.at(0))) {
 			return 1;
 		} else {
+			sending_params = true;
 			if (lista_argumenata(root->children.at(2))) {
 				return 1;
 			} else {
@@ -408,6 +446,7 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 					push_ret_val();
 				}
 			}
+			sending_params = false;
 		}
 
 	}
@@ -1148,13 +1187,14 @@ int izraz_pridruzivanja(std::shared_ptr<Node> root) {
 		// 2. <postfiks_izraz>.l-izraz = 1
 		// 3. provjeri(<izraz_pridruzivanja>)
 		// 4. <izraz_pridruzivanja>.tip ∼ <postfiks_izraz>.tip
-		updating_vars.push(true);
+		updating.push(true);
 		if (postfiks_izraz(root->children.at(0))) {
 			return 1;
 		} else {
 			if (!root->children.at(0)->lhs) {
 				return root->semantic_error();
 			} else {
+				updating.pop();
 				if (izraz_pridruzivanja(root->children.at(2))) {
 					return 1;
 				} else {
@@ -1172,6 +1212,16 @@ int izraz_pridruzivanja(std::shared_ptr<Node> root) {
 							}
 						}
 						vars_to_update.clear();
+						for (std::pair<std::string, int> arr : arrs_to_update) {
+							if (code_local_arrays.count(arr.first)) {
+								store_local_arr(arr.first, arr.second);
+							} else if (function_arrays.count(arr.first)) {
+								store_func_arr(arr.first, arr.second);
+							} else if (code_global_arrays.count(arr.first)) {
+								store_global_arr(arr.first, arr.second);
+							}
+						}
+						arrs_to_update.clear();
 					}
 				}
 			}
@@ -1852,13 +1902,9 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 									root->children.at(3)->arg_types.at(i);
 								std::string current_name =
 									root->children.at(3)->arg_names.at(i);
-								// fixati array;
 								if (is_array(current_type)) {
-									// code_local_arrays.emplace(std::make_pair(
-									// 	current_name,
-									// 	std::make_pair((i + 1) * 4, 0)));
-									// trebam zapamtit koliko je odmak na stogu
-									// od
+									function_arrays.emplace(std::make_pair(
+										current_name, (i + 1) * 4));
 								} else {
 									code_local_variables.emplace(std::make_pair(
 										current_name, (i + 1) * 4));
@@ -1901,6 +1947,7 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 	} else {
 		return root->semantic_error();
 	}
+	return_sp();
 	return 0;
 }
 
