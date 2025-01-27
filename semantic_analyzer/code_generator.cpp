@@ -12,15 +12,16 @@ std::unordered_map<std::string, std::string>
 	code_global_variables; // name -> address
 std::unordered_map<std::string, int> global_var_init;
 std::unordered_map<std::string, std::vector<int>> global_arr_init;
-std::unordered_map<std::string, std::pair<std::string, int>> code_global_arrays;
+std::multimap<std::string, std::pair<std::string, int>> code_global_arrays;
 std::unordered_map<int, std::string> code_constants;
 std::unordered_map<std::string, std::string> code_functions;
 std::multimap<std::string, int> code_local_variables;
-std::multimap<std::string, std::pair<int, int>> code_local_arrays;
+
 std::vector<std::pair<std::string, bool>> increment_after;
 std::unordered_map<int, std::vector<std::pair<std::string, int>>>
 	for_var_update;
 std::unordered_map<std::string, int> function_arrays;
+
 int loop_counter = 0;
 int mod_op = 0;
 int div_op = 0;
@@ -28,12 +29,14 @@ int mul_op = 0;
 int for_loop_skip = 0;
 
 void code_init(void) {
+	code << std::dec;
 	code << "\tMOVE 40000, R7" << std::endl;
 	code << "\tSUB R7, %D 4, R2" << std::endl;
 	code << "\tCALL F0" << std::endl;
 	code << "\tHALT" << std::endl;
 }
 void save_context(void) {
+	code << std::dec;
 	code << "\tPUSH R0" << std::endl;
 	code << "\tPUSH R1" << std::endl;
 	code << "\tPUSH R2" << std::endl;
@@ -42,6 +45,7 @@ void save_context(void) {
 	code << "\tPUSH R5" << std::endl;
 }
 void refresh_context(void) {
+	code << std::dec;
 	code << "\tPOP R5" << std::endl;
 	code << "\tPOP R4" << std::endl;
 	code << "\tPOP R3" << std::endl;
@@ -51,22 +55,28 @@ void refresh_context(void) {
 }
 
 void fn_def(std::string name, int argc) {
-	// code << name << std::endl;
+	code << std::dec;
 	code << name << "\tSUB R7, %D " << 4 * argc << ", R7" << std::endl;
 }
 
 void return_sp(void) {
+	code << std::dec;
 	code << "\tMOVE R2, R7" << std::endl;
 	code << "\tRET" << std::endl;
 }
 
 void branch_if() {
+	code << std::dec;
 	code << "\tPOP R0" << std::endl;
 	code << "\tCMP R0,0" << std::endl;
 	code << "\tJP_EQ S" << logical_skip << std::endl;
 }
-void branch_else() { code << "S" << logical_skip++ << std::endl; }
+void branch_else() {
+	code << std::dec;
+	code << "S" << logical_skip++ << std::endl;
+}
 void operation_mod(void) {
+	code << std::dec;
 	code << "MD" << mod_op << "\tPOP R0" << std::endl; // second operand
 	code << "\tPOP R1" << std::endl;				   // first operand
 	code << "\tCMP R1, R0" << std::endl;
@@ -80,6 +90,7 @@ void operation_mod(void) {
 }
 
 void operation_mul(void) {
+	code << std::dec;
 	code << "\t MOVE 0, R4" << std::endl;
 	code << "ML" << mul_op << "\tPOP R0" << std::endl; // second operand
 	code << "\tPOP R1" << std::endl;				   // first operand
@@ -95,6 +106,7 @@ void operation_mul(void) {
 }
 
 void call_fn(std::string name, size_t argc) {
+	code << std::dec;
 	int cnt = argc;
 	if (argc > 0) {
 		do {
@@ -110,9 +122,7 @@ void call_fn(std::string name, size_t argc) {
 }
 void load_var(std::string name) {
 	// first check local defs!
-	// for (auto x : code_local_variables) {
-	// 	std::cout << x.first << ' ' << x.second << std::endl;
-	// }
+	code << std::dec;
 	if (code_local_variables.count(name)) {
 		auto range = code_local_variables.equal_range(name);
 		code << "\tLOAD R0, " << "(R2-0" << std::hex << std::uppercase
@@ -128,34 +138,31 @@ void load_var(std::string name) {
 }
 
 void load_array(std::string name) {
-	// saved on stack -> moving up
-	code << "\tPOP R3" << std::endl;
-	code << "\tSUB R7, %D 4, R4" << std::endl;
-	if (code_local_arrays.count(name)) {
-		auto range = code_local_arrays.equal_range(name);
-		int length = prev(range.second)->second.second;
-		int loc = prev(range.second)->second.first;
-		for (int i = 0; i < length; ++i) {
-			code << "\tLOAD R0, " << "(R2-0" << std::hex << std::uppercase
-				 << loc - i * 4 << ')' << std::endl;
-			code << "\tPUSH R0" << std::endl;
-		}
-		code << std::dec << std::endl;
+	code << std::dec;
+	code << "\tPOP R0" << std::endl;
+	code << "\tPUSH R0" << std::endl;
+	code << "\tMOVE %D 4, R0" << std::endl;
+	code << "\tPUSH R0" << std::endl;
+	operation_mul();
+	code << "\tPOP R0" << std::endl;
+	if (function_arrays.count(name)) {
+		int loc = function_arrays.at(name);
+		code << "\tLOAD R1, " << "(R2-0" << std::hex << std::uppercase << loc
+			 << ')' << std::endl;
+		code << "\tADD R0, R1, R1" << std::endl;
+		code << "\tLOAD R0, (R1)" << std::endl;
+		code << "\tPUSH R0" << std::endl;
 	}
 	// saved in memory -> moving down
 	else if (code_global_arrays.count(name)) {
-		std::string loc = code_global_arrays.at(name).first;
-		int length = code_global_arrays.at(name).second;
+		std::cout << "ovde " << std::endl;
+		auto range = code_global_arrays.equal_range(name);
+		std::string loc = std::prev(range.second)->second.first;
 		code << "\tMOVE " << loc << ", R1" << std::endl;
-		for (int i = 0; i < length; ++i) {
-			code << "\tLOAD R0, (R1)" << std::endl;
-			code << "\tPUSH R0" << std::endl;
-			code << "\tADD R1, %D 4, R1" << std::endl;
-		}
+		code << "\tADD R0, R1, R1" << std::endl;
+		code << "\tLOAD R0, (R1)" << std::endl;
+		code << "\tPUSH R0" << std::endl;
 	}
-	code << "\tSUB R4, R3, R3" << std::endl;
-	code << "\tLOAD R0, (R3)" << std::endl;
-	code << "\tPUSH R0" << std::endl;
 }
 
 void store_global_var(std::string name) {
@@ -176,26 +183,27 @@ void store_global_arr(std::string name, int index) {
 	code << "\tPUSH R0" << std::endl;
 	operation_mul();
 	code << "\tPOP R0" << std::endl;
-	code << "\tMOVE " << code_global_arrays.at(name).first << ", R1"
-		 << std::endl;
+	code << "\tMOVE "
+		 << std::prev(code_global_arrays.equal_range(name).second)->second.first
+		 << ", R1" << std::endl;
 	code << "\tADD R1, R0, R1" << std::endl;
 	code << "\tSTORE R3, (R1)" << std::endl;
 	code << std::dec;
 }
 
-void store_local_arr(std::string name, int index) {
-	code << "\tPOP R3" << std::endl;
-	code << "\tMOVE %D 4, R0" << std::endl;
-	code << "\tPUSH R0" << std::endl;
-	operation_mul();
-	code << "\tPOP R0" << std::endl;
-	code << "\tSUB R2, %D "
-		 << std::prev(code_local_arrays.equal_range(name).second)->second.first
-		 << ", R1" << std::endl;
-	code << "\tSUB R1, R0, R1" << std::endl;
-	code << "\tSTORE R3, (R1)" << std::endl;
-	code << std::dec;
-}
+// void store_local_arr(std::string name, int index) {
+// 	code << "\tPOP R3" << std::endl;
+// 	code << "\tMOVE %D 4, R0" << std::endl;
+// 	code << "\tPUSH R0" << std::endl;
+// 	operation_mul();
+// 	code << "\tPOP R0" << std::endl;
+// 	code << "\tSUB R2, %D "
+// 		 << std::prev(code_local_arrays.equal_range(name).second)->second.first
+// 		 << ", R1" << std::endl;
+// 	code << "\tSUB R1, R0, R1" << std::endl;
+// 	code << "\tSTORE R3, (R1)" << std::endl;
+// 	code << std::dec;
+// }
 
 void store_func_arr(std::string name, int index) {
 	code << "\tPOP R3" << std::endl;
@@ -203,22 +211,22 @@ void store_func_arr(std::string name, int index) {
 	code << "\tPUSH R0" << std::endl;
 	operation_mul();
 	code << "\t POP R0" << std::endl;
-	auto range = function_arrays.equal_range(name);
 	code << "\tLOAD R1, " << "(R2-0" << std::hex << std::uppercase
-		 << std::prev(range.second)->second << ')' << std::endl;
+		 << function_arrays.at(name) << ')' << std::endl;
 	code << std::dec;
-	code << "\tSUB R1, R0, R1" << std::endl;
+	code << "\tADD R1, R0, R1" << std::endl;
 	code << "\tSTORE R3, (R1)" << std::endl;
 }
 
 void send_arr(std::string name) {
-	code << "\tSUB R2, %D "
-		 << std::prev(code_local_arrays.equal_range(name).second)->second.first
+	code << "\tMOVE "
+		 << std::prev(code_global_arrays.equal_range(name).second)->second.first
 		 << ", R0" << std::endl;
 	code << "\tPUSH R0" << std::endl;
 }
 
 void equal_comparison(bool eq) {
+	code << std::dec;
 	if (eq) {
 		code << "\tPOP R0" << std::endl;
 		code << "\tPOP R1" << std::endl;
@@ -245,7 +253,9 @@ void equal_comparison(bool eq) {
 		code << "S" << logical_skip++ << std::endl;
 	}
 }
+
 void relation_comparison(std::string op) {
+	code << std::dec;
 	if (op == "OP_LT") {
 		code << "\tPOP R0" << std::endl;
 		code << "\tPOP R1" << std::endl;
@@ -298,6 +308,7 @@ void relation_comparison(std::string op) {
 }
 
 void variable_increment_before(std::string var, bool plus) {
+	code << std::dec;
 	load_var(var);
 	code << "\tPOP R0" << std::endl;
 	if (plus) {
@@ -315,7 +326,9 @@ void variable_increment_before(std::string var, bool plus) {
 	}
 	load_var(var);
 }
+
 void variable_increment_after() {
+	code << std::dec;
 	for (std::pair<std::string, int> var : increment_after) {
 		load_var(var.first);
 		if (var.second == false) {
@@ -468,6 +481,7 @@ void load_const(std::string var) {
 }
 
 void fill_globals(void) {
+	code << std::dec;
 	for (auto x : code_global_variables) {
 		if (global_var_init.count(x.first)) {
 			code << x.second << "\tDW %D " << global_var_init.at(x.first)
@@ -489,16 +503,20 @@ void fill_globals(void) {
 					code << "\tDW %D " << global_arr_init.at(x.first).at(i)
 						 << std::endl;
 				} else {
-					code << std::endl;
+					code << "\tDW %D  0" << std::endl;
 				}
 			}
 		} else {
-			code << x.second.first << std::endl;
+			code << x.second.first << "\tDW %D 0" << std::endl;
+			for (size_t i = 1; i < x.second.second; ++i) {
+				code << "\tDW %D 0" << std::endl;
+			}
 		}
 	}
 }
 
 void fill_consts(void) {
+	code << std::dec;
 	for (auto x : code_constants) {
 		code << x.second << "\tDW %D " << x.first << std::endl;
 	}

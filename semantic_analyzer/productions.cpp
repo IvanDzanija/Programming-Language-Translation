@@ -76,28 +76,67 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 			} else {
 				root->lhs = true;
 			}
-		}
-		if (incrementing) {
-			variable_increment_before(root->children.at(0)->value,
-									  inc_op == "OP_INC");
-			incrementing = false;
-			inc_op = "";
-		} else {
-			if (code_local_variables.count(root->children.at(0)->value) ||
-				code_global_variables.count(root->children.at(0)->value)) {
-				load_var(root->children.at(0)->value);
-				if (!updating_vars.empty()) {
-					vars_to_update.push_back(root->children.at(0)->value);
-					updating_vars.pop();
+			if (code_local_variables.count(root->children.at(0)->value)) {
+				if (incrementing) {
+					variable_increment_before(root->children.at(0)->value,
+											  inc_op == "OP_INC");
+					incrementing = false;
+					inc_op = "";
+				} else {
+					if (code_local_variables.count(
+							root->children.at(0)->value) ||
+						code_global_variables.count(
+							root->children.at(0)->value)) {
+						load_var(root->children.at(0)->value);
+						if (!updating_vars.empty()) {
+							vars_to_update.push_back(
+								root->children.at(0)->value);
+							updating_vars.pop();
+						}
+						if (incrementing_after != "") {
+							increment_after.push_back(
+								make_pair(root->children.at(0)->value,
+										  incrementing_after == "OP_INC"));
+							incrementing_after = "";
+						}
+					}
 				}
-				if (incrementing_after != "") {
-					increment_after.push_back(
-						make_pair(root->children.at(0)->value,
-								  incrementing_after == "OP_INC"));
-					incrementing_after = "";
+			} else if (function_arrays.count(root->children.at(0)->value)) {
+				if (!updating_arrs.empty()) {
+					std::cout << root->children.at(0)->value << std::endl;
+					arrs_to_update.push_back(
+						std::make_pair(root->children.at(0)->value, 0));
+				}
+				updating_arrs.pop();
+			} else if (code_global_variables.count(
+						   root->children.at(0)->value)) {
+				if (incrementing) {
+					variable_increment_before(root->children.at(0)->value,
+											  inc_op == "OP_INC");
+					incrementing = false;
+					inc_op = "";
+				} else {
+					if (code_local_variables.count(
+							root->children.at(0)->value) ||
+						code_global_variables.count(
+							root->children.at(0)->value)) {
+						load_var(root->children.at(0)->value);
+						if (!updating_vars.empty()) {
+							vars_to_update.push_back(
+								root->children.at(0)->value);
+							updating_vars.pop();
+						}
+						if (incrementing_after != "") {
+							increment_after.push_back(
+								make_pair(root->children.at(0)->value,
+										  incrementing_after == "OP_INC"));
+							incrementing_after = "";
+						}
+					}
 				}
 			}
 		}
+
 		// check if its a function
 		if (available_functions.count(root->children.at(0)->value)) {
 			auto range =
@@ -155,27 +194,18 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 			}
 			if (indexing_array) {
 				indexed_array = root->children.at(0)->value;
-			}
-			if (code_functions.count(root->children.at(0)->value)) {
-				if (!updating_arrs.empty()) {
-					arrs_to_update.push_back(
-						std::make_pair(root->children.at(0)->value, 0));
-				}
-				updating_arrs.pop();
-			} else if (code_global_arrays.count(root->children.at(0)->value)) {
-				if (!updating_arrs.empty()) {
-					arrs_to_update.push_back(
-						std::make_pair(root->children.at(0)->value, 0));
-				}
-				updating_arrs.pop();
-			} else if (code_local_arrays.count(root->children.at(0)->value)) {
-				if (!updating_arrs.empty()) {
-					arrs_to_update.push_back(
-						std::make_pair(root->children.at(0)->value, 0));
-				}
-				updating_arrs.pop();
+			} else if (indexing_array == false && sending_params) {
 				send_arr(root->children.at(0)->value);
 			}
+
+			if (code_global_arrays.count(root->children.at(0)->value)) {
+				if (!updating_arrs.empty()) {
+					arrs_to_update.push_back(
+						std::make_pair(root->children.at(0)->value, 0));
+				}
+				updating_arrs.pop();
+			}
+
 		} else if (deepest_block == -1) {
 			return root->semantic_error();
 		}
@@ -222,6 +252,7 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 				global_arr_init.at(current_global_array).push_back(temp);
 			}
 		}
+
 	}
 	// <primarni_izraz> ::= ZNAK
 	// tip ← char
@@ -1213,9 +1244,8 @@ int izraz_pridruzivanja(std::shared_ptr<Node> root) {
 						}
 						vars_to_update.clear();
 						for (std::pair<std::string, int> arr : arrs_to_update) {
-							if (code_local_arrays.count(arr.first)) {
-								store_local_arr(arr.first, arr.second);
-							} else if (function_arrays.count(arr.first)) {
+							std::cout << arr.first << std::endl;
+							if (function_arrays.count(arr.first)) {
 								store_func_arr(arr.first, arr.second);
 							} else if (code_global_arrays.count(arr.first)) {
 								store_global_arr(arr.first, arr.second);
@@ -1333,11 +1363,6 @@ int slozena_naredba(std::shared_ptr<Node> root) {
 	for (auto array : available_arrays) {
 		if (array.second.first != block_count) {
 			new_available_arrays.insert(array);
-		} else {
-			auto range = code_local_arrays.equal_range(array.first);
-			if (range.first != range.second) {
-				code_local_arrays.erase(std::prev(range.second));
-			}
 		}
 	}
 	for (auto function : available_functions) {
@@ -1894,7 +1919,6 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 							}
 
 							// write parameter names as local variables
-							// which is pushed first ???????
 							for (size_t i = 0;
 								 i < root->children.at(3)->arg_types.size();
 								 ++i) {
@@ -1938,6 +1962,7 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 								current_function_argument_names.clear();
 								current_function_argument_types.clear();
 								from_function = false;
+								function_arrays.clear();
 							}
 						}
 					}
@@ -2153,6 +2178,7 @@ int init_deklarator(std::shared_ptr<Node> root) {
 				is_const(remove_array(root->children.at(0)->type))) {
 				return root->semantic_error();
 			} else {
+				current_global_array = "";
 			}
 		}
 	}
@@ -2177,6 +2203,8 @@ int init_deklarator(std::shared_ptr<Node> root) {
 			if (inicijalizator(root->children.at(2))) {
 				return 1;
 			}
+			current_global_array = "";
+
 			if (is_array(root->children.at(0)->type)) {
 				if (!(root->children.at(2)->element_count <=
 					  root->children.at(0)->element_count)) {
@@ -2278,19 +2306,12 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 						std::make_pair(block_count,
 									   std::make_pair(current_type, number))));
 					local_names.insert(root->children.at(0)->value);
-					if (block_count == 0) {
-						current_global_array = root->children.at(0)->value;
-						std::string next_name = "A";
-						next_name += std::to_string(code_global_arrays.size());
-						code_global_arrays.emplace(
-							std::make_pair(root->children.at(0)->value,
-										   std::make_pair(next_name, number)));
-					} else {
-						code_local_arrays.emplace(std::make_pair(
-							root->children.at(0)->value,
-							std::make_pair(code_local_arrays.size() * 4 + 4,
-										   number)));
-					}
+					current_global_array = root->children.at(0)->value;
+					std::string next_name = "A";
+					next_name += std::to_string(code_global_arrays.size());
+					code_global_arrays.emplace(
+						std::make_pair(root->children.at(0)->value,
+									   std::make_pair(next_name, number)));
 				} catch (const std::out_of_range &oor) {
 					return root->semantic_error();
 				}
@@ -2429,7 +2450,6 @@ int inicijalizator(std::shared_ptr<Node> root) {
 		} else {
 			root->element_count = root->children.at(1)->element_count;
 			root->arg_types = root->children.at(1)->arg_types;
-			current_global_array = "";
 		}
 
 	} else {

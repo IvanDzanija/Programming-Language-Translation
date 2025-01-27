@@ -5,13 +5,11 @@
 #include <vector>
 
 extern std::unordered_map<std::string, std::string> code_global_variables;
-extern std::unordered_map<std::string, std::pair<std::string, int>>
+extern std::multimap<std::string, std::pair<std::string, int>>
 	code_global_arrays;
 extern std::unordered_map<int, std::string> code_constants;
 extern std::unordered_map<std::string, std::string> code_functions;
 extern std::multimap<std::string, int> code_local_variables;
-extern std::multimap<std::string, std::pair<int, int>>
-	code_local_arrays; // name -> location, size
 extern std::unordered_map<std::string, int> global_var_init;
 extern std::unordered_map<std::string, std::vector<int>> global_arr_init;
 extern std::vector<std::pair<std::string, bool>> increment_after;
