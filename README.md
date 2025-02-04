@@ -6,6 +6,6 @@ Software implementation of specific parts of a compiler or a compiler in general
 - [syntax](/synAnalysis)
 - [semantic](/semAnalysis)<br>
 ### Major phases of synthesis:
-- [intermediate code generation](/)
-- [optimization](/)
-- [target code generation](/)
+- [intermediate code generation](/code_generator)
+- [optimization](/code_generator)
+- [target code generation](/code_generator)
