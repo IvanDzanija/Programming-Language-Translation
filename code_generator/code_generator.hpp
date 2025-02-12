@@ -59,3 +59,5 @@ void operation_div(void);
 void operation_mul(void);
 void operation_mod(void);
 void send_arr(std::string name);
+void not_operator();
+void tilde_operator();

@@ -26,6 +26,7 @@ int loop_counter = 0;
 int mod_op = 0;
 int div_op = 0;
 int mul_op = 0;
+int not_op = 0;
 int for_loop_skip = 0;
 
 void code_init(void) {
@@ -123,6 +124,24 @@ void operation_div(void) {
 	code << "\tJP DV" << div_op << std::endl;
 	code << "DV" << ++div_op << "\tPUSH R4" << std::endl;
 	++mul_op;
+}
+
+void not_operator() {
+	// compare result with 0
+	// 1. case -> result is equal to 0 -> convert to 1
+	// 2. case -> result is not equal to 0 -> convert to 0
+	code << "\tPOP R0" << std::endl;
+	code << "\tCMP R0, 0" << std::endl;
+	code << "\tJP_EQ NT" << not_op << std::endl;
+	code << "\tMOVE %D 0, R0" << std::endl;
+	code << "\tJP NT" << not_op + 1 << std::endl;
+	code << "NT" << not_op++ << "\tMOVE %D 1, R0" << std::endl;
+	code << "NT" << not_op << "\tPUSH R0" << std::endl;
+}
+void tilde_operator() {
+	code << "\tPOP R0" << std::endl;
+	code << "\tXOR R0, 0FFFFFFFF, R0" << std::endl;
+	code << "\tPUSH R0" << std::endl;
 }
 
 void call_fn(std::string name, size_t argc) {

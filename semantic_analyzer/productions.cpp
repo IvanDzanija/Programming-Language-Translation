@@ -28,6 +28,8 @@ std::unordered_multimap<
 	available_functions;
 bool main_defined = false;
 int block_count = 0;
+std::stack<bool> is_tilde_op;
+std::stack<bool> is_not_op;
 bool is_minus = false;
 bool from_function = false;
 
@@ -613,9 +615,16 @@ int unarni_izraz(std::shared_ptr<Node> root) {
 				return root->semantic_error();
 			} else {
 				root->type = "int";
-
 				root->lhs = false;
 				is_minus = false;
+				if (!is_tilde_op.empty()) {
+					tilde_operator();
+					is_tilde_op.pop();
+				}
+				if (!is_not_op.empty()) {
+					not_operator();
+					is_not_op.pop();
+				}
 			}
 		}
 
@@ -628,6 +637,10 @@ int unarni_izraz(std::shared_ptr<Node> root) {
 int unarni_operator(std::shared_ptr<Node> root) {
 	if (root->children.at(0)->symbol == "MINUS") {
 		is_minus = true;
+	} else if (root->children.at(0)->symbol == "OP_TILDA") {
+		is_tilde_op.push(true);
+	} else if (root->children.at(0)->symbol == "OP_NEG") {
+		is_not_op.push(true);
 	}
 	return 0;
 }
