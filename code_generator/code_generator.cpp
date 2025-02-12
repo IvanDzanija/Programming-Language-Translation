@@ -105,6 +105,26 @@ void operation_mul(void) {
 	++mul_op;
 }
 
+void operation_div(void) {
+	// we subtract the second operand from the first operand while the first is
+	// larger then the second, on each cycle the result in register R4 is
+	// incremented by 1
+
+	code << std::dec;
+	code << "\t MOVE 0, R4" << std::endl;
+	code << "DV" << div_op << "\tPOP R0" << std::endl; // second operand
+	code << "\tPOP R1" << std::endl;				   // first operand
+	code << "\tCMP R1, R0" << std::endl;
+	code << "\tJP_ULT DV" << div_op + 1 << std::endl;
+	code << "\tADD R4, 1, R4" << std::endl;
+	code << "\tSUB R1, R0, R1" << std::endl;
+	code << "\tPUSH R1" << std::endl;
+	code << "\tPUSH R0" << std::endl;
+	code << "\tJP DV" << div_op << std::endl;
+	code << "DV" << ++div_op << "\tPUSH R4" << std::endl;
+	++mul_op;
+}
+
 void call_fn(std::string name, size_t argc) {
 	code << std::dec;
 	int cnt = argc;
@@ -140,11 +160,7 @@ void load_var(std::string name) {
 void load_array(std::string name) {
 	code << std::dec;
 	code << "\tPOP R0" << std::endl;
-	code << "\tPUSH R0" << std::endl;
-	code << "\tMOVE %D 4, R0" << std::endl;
-	code << "\tPUSH R0" << std::endl;
-	operation_mul();
-	code << "\tPOP R0" << std::endl;
+	code << "\tSHL R0, 2, R0" << std::endl;
 	if (function_arrays.count(name)) {
 		int loc = function_arrays.at(name);
 		code << "\tLOAD R1, " << "(R2-0" << std::hex << std::uppercase << loc
@@ -178,10 +194,8 @@ void store_local_var(std::string name) {
 }
 void store_global_arr(std::string name, int index) {
 	code << "\tPOP R3" << std::endl;
-	code << "\tMOVE %D 4, R0" << std::endl;
-	code << "\tPUSH R0" << std::endl;
-	operation_mul();
 	code << "\tPOP R0" << std::endl;
+	code << "\tSHL R0, 2, R0" << std::endl;
 	code << "\tMOVE "
 		 << std::prev(code_global_arrays.equal_range(name).second)->second.first
 		 << ", R1" << std::endl;
@@ -205,11 +219,12 @@ void store_global_arr(std::string name, int index) {
 // }
 
 void store_func_arr(std::string name, int index) {
-	code << "\tPOP R3" << std::endl;
-	code << "\tMOVE %D 4, R0" << std::endl;
-	code << "\tPUSH R0" << std::endl;
-	operation_mul();
+	code << "\tPOP R3" << std::endl; // updated value in register R3
+
+	// next thing on stack should always be the index
+	// we take the index and multiply by 4 -> left shift by 2 bits
 	code << "\tPOP R0" << std::endl;
+	code << "\tSHL R0, 2, R0" << std::endl;
 	code << "\tLOAD R1, " << "(R2-0" << std::hex << std::uppercase
 		 << function_arrays.at(name) << ')' << std::endl;
 	code << std::dec;
@@ -521,5 +536,3 @@ void fill_consts(void) {
 	}
 	code.close();
 }
-
-void operation_div(void) {}

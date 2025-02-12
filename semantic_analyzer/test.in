@@ -31,13 +31,13 @@
                      <postfiks_izraz>
                       <primarni_izraz>
                        BROJ 2 1
-                OP_LTE 2 <=
+                OP_GTE 2 >=
                 <aditivni_izraz>
                  <multiplikativni_izraz>
                   <cast_izraz>
                    <unarni_izraz>
                     <postfiks_izraz>
                      <primarni_izraz>
-                      BROJ 2 2
+                      BROJ 2 1
        TOCKAZAREZ 2 ;
     D_VIT_ZAGRADA 3 }
