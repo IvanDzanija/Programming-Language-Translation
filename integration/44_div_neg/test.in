@@ -35,19 +35,19 @@
                     <multiplikativni_izraz>
                      <cast_izraz>
                       <unarni_izraz>
-                       <postfiks_izraz>
-                        <primarni_izraz>
-                         BROJ 2 4
-                    OP_PUTA 2 *
+                       <unarni_operator>
+                        MINUS 2 -
+                       <cast_izraz>
+                        <unarni_izraz>
+                         <postfiks_izraz>
+                          <primarni_izraz>
+                           BROJ 2 19
+                    OP_DIJELI 2 /
                     <cast_izraz>
                      <unarni_izraz>
-                      <unarni_operator>
-                       MINUS 2 -
-                      <cast_izraz>
-                       <unarni_izraz>
-                        <postfiks_izraz>
-                         <primarni_izraz>
-                          BROJ 2 3
+                      <postfiks_izraz>
+                       <primarni_izraz>
+                        BROJ 2 8
        TOCKAZAREZ 2 ;
      <deklaracija>
       <ime_tipa>
@@ -70,17 +70,6 @@
                  <aditivni_izraz>
                   <multiplikativni_izraz>
                    <multiplikativni_izraz>
-                    <multiplikativni_izraz>
-                     <cast_izraz>
-                      <unarni_izraz>
-                       <unarni_operator>
-                        MINUS 3 -
-                       <cast_izraz>
-                        <unarni_izraz>
-                         <postfiks_izraz>
-                          <primarni_izraz>
-                           BROJ 3 4
-                    OP_PUTA 3 *
                     <cast_izraz>
                      <unarni_izraz>
                       <unarni_operator>
@@ -89,13 +78,17 @@
                        <unarni_izraz>
                         <postfiks_izraz>
                          <primarni_izraz>
-                          BROJ 3 4
-                   OP_PUTA 3 *
+                          BROJ 3 9
+                   OP_DIJELI 3 /
                    <cast_izraz>
                     <unarni_izraz>
-                     <postfiks_izraz>
-                      <primarni_izraz>
-                       BROJ 3 5
+                     <unarni_operator>
+                      MINUS 3 -
+                     <cast_izraz>
+                      <unarni_izraz>
+                       <postfiks_izraz>
+                        <primarni_izraz>
+                         BROJ 3 3
       TOCKAZAREZ 3 ;
     <lista_naredbi>
      <naredba>

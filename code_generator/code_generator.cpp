@@ -27,6 +27,7 @@ int mod_op = 0;
 int div_op = 0;
 int mul_op = 0;
 int not_op = 0;
+int not_negative = 0;
 int for_loop_skip = 0;
 
 void code_init(void) {
@@ -112,18 +113,36 @@ void operation_div(void) {
 	// incremented by 1
 
 	code << std::dec;
-	code << "\t MOVE 0, R4" << std::endl;
+	code << "\tMOVE %D 0, R4" << std::endl;
+	code << "\tMOVE %D 0, R6" << std::endl;
+	code << "\tPOP R0" << std::endl;
+	code << "\tPOP R1" << std::endl;
+	code << "\tCMP R1, %D 0" << std::endl;
+	code << "\tJP_SGE NG" << not_negative << std::endl;
+	code << "\tXOR R1, %D -1, R1" << std::endl;
+	code << "\tADD R1, %D 1, R1" << std::endl;
+	code << "\tXOR R6, %D -1, R6" << std::endl;
+	code << "NG" << not_negative++ << "\tCMP R0, %D 0" << std::endl;
+	code << "\tJP_SGE NG" << not_negative << std::endl;
+	code << "\tXOR R0, %D -1, R0" << std::endl;
+	code << "\tADD R0, %D 1, R0" << std::endl;
+	code << "\tXOR R6, %D -1, R6" << std::endl;
+	code << "\tJP NG" << not_negative << std::endl;
 	code << "DV" << div_op << "\tPOP R0" << std::endl; // second operand
 	code << "\tPOP R1" << std::endl;				   // first operand
-	code << "\tCMP R1, R0" << std::endl;
-	code << "\tJP_ULT DV" << div_op + 1 << std::endl;
+	code << "NG" << not_negative++ << "\tCMP R1, R0" << std::endl;
+	code << "\tJP_SLT DV" << div_op + 1 << std::endl;
 	code << "\tADD R4, 1, R4" << std::endl;
 	code << "\tSUB R1, R0, R1" << std::endl;
 	code << "\tPUSH R1" << std::endl;
 	code << "\tPUSH R0" << std::endl;
 	code << "\tJP DV" << div_op << std::endl;
-	code << "DV" << ++div_op << "\tPUSH R4" << std::endl;
-	++mul_op;
+	code << "DV" << ++div_op << "\tCMP R6, %D 0" << std::endl;
+	code << "\tJP_EQ NG" << not_negative << std::endl;
+	code << "\tXOR R4, R6, R4" << std::endl;
+	code << "\tADD R4, %D 1, R4" << std::endl;
+	code << "NG" << not_negative++ << "\tPUSH R4" << std::endl;
+	++div_op;
 }
 
 void not_operator() {
@@ -147,6 +166,10 @@ void tilde_operator() {
 void call_fn(std::string name, size_t argc) {
 	code << std::dec;
 	int cnt = argc;
+	std::cout << name << ' ' << argc << std::endl;
+	for (auto x : code_functions) {
+		std::cout << x.first << ' ' << x.second << std::endl;
+	}
 	if (argc > 0) {
 		do {
 			code << "\tADD R7, %D 4, R7" << std::endl;

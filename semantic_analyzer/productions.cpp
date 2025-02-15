@@ -473,9 +473,10 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 				} else {
 					root->type = root->children.at(0)->return_type;
 					root->lhs = false;
-
+					std::cout << "1" << std::endl;
 					std::string fn_name = fn_call_name.top();
 					fn_call_name.pop();
+					std::cout << "2" << std::endl;
 					call_fn(fn_name, root->children.at(2)->arg_types.size());
 					refresh_context();
 					push_ret_val();
@@ -1381,6 +1382,9 @@ int slozena_naredba(std::shared_ptr<Node> root) {
 		}
 	}
 	for (auto function : available_functions) {
+		std::cout << function.first << std::endl
+				  << ' ' << function.second.first << std::endl;
+
 		if (function.second.first != block_count) {
 			new_available_functions.insert(function);
 		}
@@ -1402,6 +1406,7 @@ int slozena_naredba(std::shared_ptr<Node> root) {
 	available_functions.swap(new_available_functions);
 	available_variables.swap(new_available_variables);
 	--block_count;
+	std::cout << "tu" << std::endl;
 	return 0;
 }
 
@@ -1813,25 +1818,32 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 						from_function = true;
 
 						// generate new label
-						if (root->children.at(1)->value == "main") {
-							code_functions.emplace(
-								std::make_pair("main", "F0"));
-							fn_def("F0", 0);
-						} else if (code_functions.count("main")) {
-							std::string next_name = "F";
-							next_name += std::to_string(code_functions.size());
-							code_functions.emplace(std::make_pair(
-								root->children.at(1)->value, next_name));
-							fn_def(next_name,
-								   current_function_argument_types.size());
+						if (code_functions.count(root->children.at(1)->value)) {
+							fn_def(
+								code_functions.at(root->children.at(1)->value),
+								current_function_argument_types.size());
 						} else {
-							std::string next_name = "F";
-							next_name +=
-								std::to_string(code_functions.size() + 1);
-							code_functions.emplace(std::make_pair(
-								root->children.at(1)->value, next_name));
-							fn_def(next_name,
-								   current_function_argument_types.size());
+							if (root->children.at(1)->value == "main") {
+								code_functions.emplace(
+									std::make_pair("main", "F0"));
+								fn_def("F0", 0);
+							} else if (code_functions.count("main")) {
+								std::string next_name = "F";
+								next_name +=
+									std::to_string(code_functions.size());
+								code_functions.emplace(std::make_pair(
+									root->children.at(1)->value, next_name));
+								fn_def(next_name,
+									   current_function_argument_types.size());
+							} else {
+								std::string next_name = "F";
+								next_name +=
+									std::to_string(code_functions.size() + 1);
+								code_functions.emplace(std::make_pair(
+									root->children.at(1)->value, next_name));
+								fn_def(next_name,
+									   current_function_argument_types.size());
+							}
 						}
 						if (slozena_naredba(root->children.at(5))) {
 							return 1;
@@ -1916,22 +1928,34 @@ int definicija_funkcije(std::shared_ptr<Node> root) {
 								root->children.at(3)->arg_types;
 
 							// generate new label
-							if (code_functions.count("main")) {
-								std::string next_name = "F";
-								next_name +=
-									std::to_string(code_functions.size());
-								code_functions.emplace(std::make_pair(
-									root->children.at(1)->value, next_name));
-								fn_def(next_name,
+							if (code_functions.count(
+									root->children.at(1)->value)) {
+								fn_def(code_functions.at(
+										   root->children.at(1)->value),
 									   current_function_argument_types.size());
+
 							} else {
-								std::string next_name = "F";
-								next_name +=
-									std::to_string(code_functions.size() + 1);
-								code_functions.emplace(std::make_pair(
-									root->children.at(1)->value, next_name));
-								fn_def(next_name,
-									   current_function_argument_types.size());
+								if (code_functions.count("main")) {
+									std::string next_name = "F";
+									next_name +=
+										std::to_string(code_functions.size());
+									code_functions.emplace(std::make_pair(
+										root->children.at(1)->value,
+										next_name));
+									fn_def(
+										next_name,
+										current_function_argument_types.size());
+								} else {
+									std::string next_name = "F";
+									next_name += std::to_string(
+										code_functions.size() + 1);
+									code_functions.emplace(std::make_pair(
+										root->children.at(1)->value,
+										next_name));
+									fn_def(
+										next_name,
+										current_function_argument_types.size());
+								}
 							}
 
 							// write parameter names as local variables
@@ -2131,6 +2155,7 @@ int deklaracija(std::shared_ptr<Node> root) {
 			return 1;
 		} else {
 			root->children.at(1)->inherited_type = root->children.at(0)->type;
+			std::cout << root->children.at(0)->type << std::endl;
 			if (lista_init_deklaratora(root->children.at(1))) {
 				return 1;
 			}
@@ -2368,6 +2393,20 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 				std::make_pair(root->children.at(0)->value, function_value));
 			local_names.insert(root->children.at(0)->value);
 		}
+
+		if (root->children.at(0)->value == "main") {
+			code_functions.emplace(std::make_pair("main", "F0"));
+		} else if (code_functions.count("main")) {
+			std::string next_name = "F";
+			next_name += std::to_string(code_functions.size());
+			code_functions.emplace(
+				std::make_pair(root->children.at(0)->value, next_name));
+		} else {
+			std::string next_name = "F";
+			next_name += std::to_string(code_functions.size() + 1);
+			code_functions.emplace(
+				std::make_pair(root->children.at(0)->value, next_name));
+		}
 		std::string current_type = "funkcija(void -> ";
 		current_type += root->inherited_type;
 		current_type += ")";
@@ -2414,6 +2453,19 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 			std::string current_type = "funkcija(params -> ";
 			current_type += root->inherited_type;
 			current_type += ")";
+			if (root->children.at(0)->value == "main") {
+				code_functions.emplace(std::make_pair("main", "F0"));
+			} else if (code_functions.count("main")) {
+				std::string next_name = "F";
+				next_name += std::to_string(code_functions.size());
+				code_functions.emplace(
+					std::make_pair(root->children.at(0)->value, next_name));
+			} else {
+				std::string next_name = "F";
+				next_name += std::to_string(code_functions.size() + 1);
+				code_functions.emplace(
+					std::make_pair(root->children.at(0)->value, next_name));
+			}
 		}
 	} else {
 		return root->semantic_error();
