@@ -473,10 +473,8 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 				} else {
 					root->type = root->children.at(0)->return_type;
 					root->lhs = false;
-					std::cout << "1" << std::endl;
 					std::string fn_name = fn_call_name.top();
 					fn_call_name.pop();
-					std::cout << "2" << std::endl;
 					call_fn(fn_name, root->children.at(2)->arg_types.size());
 					refresh_context();
 					push_ret_val();
@@ -1252,6 +1250,7 @@ int izraz_pridruzivanja(std::shared_ptr<Node> root) {
 						root->type = root->children.at(0)->type;
 						root->lhs = false;
 						for (std::string var : vars_to_update) {
+							std::cout << var << std::endl;
 							if (code_local_variables.count(var)) {
 								store_local_var(var);
 							} else if (code_global_variables.count(var)) {
@@ -1382,8 +1381,6 @@ int slozena_naredba(std::shared_ptr<Node> root) {
 		}
 	}
 	for (auto function : available_functions) {
-		std::cout << function.first << std::endl
-				  << ' ' << function.second.first << std::endl;
 
 		if (function.second.first != block_count) {
 			new_available_functions.insert(function);
@@ -1406,7 +1403,6 @@ int slozena_naredba(std::shared_ptr<Node> root) {
 	available_functions.swap(new_available_functions);
 	available_variables.swap(new_available_variables);
 	--block_count;
-	std::cout << "tu" << std::endl;
 	return 0;
 }
 
@@ -2155,7 +2151,6 @@ int deklaracija(std::shared_ptr<Node> root) {
 			return 1;
 		} else {
 			root->children.at(1)->inherited_type = root->children.at(0)->type;
-			std::cout << root->children.at(0)->type << std::endl;
 			if (lista_init_deklaratora(root->children.at(1))) {
 				return 1;
 			}
@@ -2220,6 +2215,9 @@ int init_deklarator(std::shared_ptr<Node> root) {
 				return root->semantic_error();
 			} else {
 				current_global_array = "";
+				if (block_count != 0) {
+					push_empty_var();
+				}
 			}
 		}
 	}

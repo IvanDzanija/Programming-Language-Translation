@@ -260,19 +260,11 @@ void store_global_arr(std::string name, int index) {
 	code << std::dec;
 }
 
-// void store_local_arr(std::string name, int index) {
-// 	code << "\tPOP R3" << std::endl;
-// 	code << "\tMOVE %D 4, R0" << std::endl;
-// 	code << "\tPUSH R0" << std::endl;
-// 	operation_mul();
-// 	code << "\tPOP R0" << std::endl;
-// 	code << "\tSUB R2, %D "
-// 		 << std::prev(code_local_arrays.equal_range(name).second)->second.first
-// 		 << ", R1" << std::endl;
-// 	code << "\tSUB R1, R0, R1" << std::endl;
-// 	code << "\tSTORE R3, (R1)" << std::endl;
-// 	code << std::dec;
-// }
+void push_empty_var() {
+	// possibly cannot initialize to 0
+	code << "\tMOVE %D 0, R0" << std::endl;
+	code << "\tPUSH R0" << std::endl;
+}
 
 void store_func_arr(std::string name, int index) {
 	code << "\tPOP R3" << std::endl; // updated value in register R3

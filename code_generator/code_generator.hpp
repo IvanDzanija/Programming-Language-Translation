@@ -61,3 +61,4 @@ void operation_mod(void);
 void send_arr(std::string name);
 void not_operator();
 void tilde_operator();
+void push_empty_var();
