@@ -420,7 +420,7 @@ void variable_increment_after(void) {
 }
 
 void loop_break(void) { code << "\tJP BR" << break_counter << std::endl; }
-void loop_continue(void) {}
+void loop_continue(void) { code << "\tJP CN" << break_counter << std::endl; }
 
 void while_start(void) { code << "L" << loop_counter << std::endl; }
 void while_check(void) {
@@ -429,13 +429,12 @@ void while_check(void) {
 	code << "\tJP_EQ E" << loop_counter << std::endl;
 }
 void while_end(void) {
-	code << "\tJP L" << loop_counter << std::endl;
+	code << "CN" << break_counter << "\tJP L" << loop_counter << std::endl;
 	code << "E" << loop_counter++ << std::endl;
 	code << "BR" << break_counter++ << std::endl;
 }
 void forc_start(void) {
-	code << "L" << loop_counter << std::endl;
-	code << "\tMOVE %D 0, R5" << std::endl;
+	code << "L" << loop_counter << "\tMOVE %D 0, R5" << std::endl;
 }
 
 void forc_check(void) {
@@ -444,8 +443,7 @@ void forc_check(void) {
 	code << "\tJP_EQ E" << loop_counter << std::endl;
 }
 void forc_skip_first(void) {
-	code << "I" << for_loop_skip << std::endl;
-	code << "\tCMP R5, 0" << std::endl;
+	code << "I" << for_loop_skip << "\tCMP R5, 0" << std::endl;
 	code << "\tJP_EQ K" << for_loop_skip << std::endl;
 }
 void forc_skip_second(void) {
@@ -455,9 +453,13 @@ void forc_skip_second(void) {
 	code << "\tJP_EQ AE" << for_loop_skip << std::endl;
 	code << "K" << for_loop_skip << std::endl;
 }
+void inf_loop() {
+	code << "\tMOVE %D 1, R0" << std::endl;
+	code << "\tPUSH R0" << std::endl;
+}
 
 void forc_end(void) {
-	code << "\tMOVE %D 1, R5" << std::endl;
+	code << "CN" << break_counter << "\tMOVE %D 1, R5" << std::endl;
 	code << "\tJP I" << for_loop_skip << std::endl;
 	code << "J" << for_loop_skip << "\tJP L" << loop_counter << std::endl;
 	code << "E" << loop_counter++ << "\tMOVE %D 2, R5" << std::endl;

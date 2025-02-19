@@ -1828,6 +1828,9 @@ int naredba_petlje(std::shared_ptr<Node> root) {
 		} else if (!implicit_conversion(root->children.at(3)->type, "int")) {
 			return root->semantic_error();
 		} else {
+			if (root->children.at(3)->children.size() == 1) {
+				inf_loop();
+			}
 			while_check();
 			if (naredba(root->children.at(5))) {
 				return 1;
@@ -1860,11 +1863,15 @@ int naredba_petlje(std::shared_ptr<Node> root) {
 		} else if (!implicit_conversion(root->children.at(3)->type, "int")) {
 			return root->semantic_error();
 		} else {
+			if (root->children.at(3)->children.size() == 1) {
+				inf_loop();
+			}
 			forc_check();
 			forc_skip_first();
 			if (izraz(root->children.at(4))) {
 				return 1;
 			}
+			variable_increment_after();
 			forc_skip_second();
 			if (naredba(root->children.at(6))) {
 				return 1;

@@ -70,3 +70,4 @@ void skip_end(void);
 void send_function_arr(std::string name);
 void loop_continue(void);
 void loop_break(void);
+void inf_loop(void);
