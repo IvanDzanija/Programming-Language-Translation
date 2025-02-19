@@ -89,11 +89,12 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 				} else {
 					if (code_local_variables.count(
 							root->children.at(0)->value)) {
-						load_var(root->children.at(0)->value);
 						if (!updating_vars.empty()) {
 							vars_to_update.push_back(
 								root->children.at(0)->value);
 							updating_vars.pop();
+						} else {
+							load_var(root->children.at(0)->value);
 						}
 						if (incrementing_after != "") {
 							increment_after.push_back(
@@ -122,11 +123,12 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 				} else {
 					if (code_global_variables.count(
 							root->children.at(0)->value)) {
-						load_var(root->children.at(0)->value);
 						if (!updating_vars.empty()) {
 							vars_to_update.push_back(
 								root->children.at(0)->value);
 							updating_vars.pop();
+						} else {
+							load_var(root->children.at(0)->value);
 						}
 						if (incrementing_after != "") {
 							increment_after.push_back(
@@ -241,17 +243,26 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 		load_const(code_constants.at(temp));
 		if (current_global_variable != "") {
 			if (!global_var_init.count(current_global_variable)) {
-				global_var_init.emplace(
-					make_pair(current_global_variable, temp));
+				global_var_init.emplace(make_pair(
+					current_global_variable,
+					std::vector<std::string>(1, std::to_string(temp))));
+			} else {
+				global_var_init.at(current_global_variable)
+					.push_back(std::to_string(temp));
 			}
-			current_global_variable = "";
 		}
 		if (current_global_array != "") {
 			if (!global_arr_init.count(current_global_array)) {
-				global_arr_init.emplace(
-					make_pair(current_global_array, std::vector<int>(1, temp)));
+				global_arr_init.emplace(make_pair(
+					current_global_array,
+					std::vector<std::vector<std::string>>(
+						1, std::vector<std::string>(1, std::to_string(temp)))));
 			} else {
-				global_arr_init.at(current_global_array).push_back(temp);
+				size_t index =
+					global_arr_init.at(current_global_array).size() - 1;
+				global_arr_init.at(current_global_array)
+					.at(index)
+					.push_back(std::to_string(temp));
 			}
 		}
 
@@ -284,20 +295,30 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 					next_name += std::to_string(code_constants.size());
 					code_constants.emplace(std::make_pair(cval, next_name));
 				}
+				load_const(code_constants.at(cval));
 				if (current_global_variable != "") {
 					if (!global_var_init.count(current_global_variable)) {
-						global_var_init.emplace(
-							make_pair(current_global_variable, cval));
+						global_var_init.emplace(make_pair(
+							current_global_variable,
+							std::vector<std::string>(1, std::to_string(cval))));
+					} else {
+						global_var_init.at(current_global_array)
+							.push_back(std::to_string(cval));
 					}
-					current_global_variable = "";
 				}
 				if (current_global_array != "") {
 					if (!global_arr_init.count(current_global_array)) {
-						global_arr_init.emplace(make_pair(
-							current_global_array, std::vector<int>(1, cval)));
+						global_arr_init.emplace(
+							make_pair(current_global_array,
+									  std::vector<std::vector<std::string>>(
+										  1, std::vector<std::string>(
+												 1, std::to_string(cval)))));
 					} else {
+						size_t index =
+							global_arr_init.at(current_global_array).size() - 1;
 						global_arr_init.at(current_global_array)
-							.push_back(cval);
+							.at(index)
+							.push_back(std::to_string(cval));
 					}
 				}
 			}
@@ -328,8 +349,24 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 				}
 			}
 		}
+		if (current_global_array != "") {
+			std::string first_element =
+				std::to_string((int)root->children.at(0)->value.at(1));
+			global_arr_init.emplace(std::make_pair(
+				current_global_array,
+				std::vector<std::vector<std::string>>(
+					1, std::vector<std::string>(1, first_element))));
+			size_t index = 1;
+			while (++index < root->children.at(0)->value.size() - 1) {
+				std::string next_element =
+					std::to_string((int)root->children.at(0)->value.at(index));
+				global_arr_init.at(current_global_array)
+					.push_back(std::vector<std::string>(1, next_element));
+			}
+		}
 		root->type = "niz(const(char))";
 		root->lhs = false;
+
 	}
 	// 	<primarni_izraz> ::= L_ZAGRADA <izraz> D_ZAGRADA
 	// tip ← <izraz>.tip
@@ -581,7 +618,6 @@ int unarni_izraz(std::shared_ptr<Node> root) {
 		if (unarni_izraz(root->children.at(1))) {
 			return 1;
 		} else {
-
 			if (!root->children.at(1)->lhs) {
 				return root->semantic_error();
 			} else if (!implicit_conversion(root->children.at(1)->type,
@@ -637,8 +673,58 @@ int unarni_operator(std::shared_ptr<Node> root) {
 	if (root->children.at(0)->symbol == "MINUS") {
 		is_minus = true;
 	} else if (root->children.at(0)->symbol == "OP_TILDA") {
+		if (current_global_variable != "") {
+			if (global_var_init.count(current_global_variable)) {
+				global_var_init.at(current_global_variable)
+					.push_back(root->children.at(0)->symbol);
+			} else {
+				global_var_init.emplace(std::make_pair(
+					current_global_variable,
+					std::vector<std::string>(1, root->children.at(0)->symbol)));
+			}
+		}
+		if (current_global_array != "") {
+			if (!global_arr_init.count(current_global_array)) {
+				global_arr_init.emplace(
+					make_pair(current_global_array,
+							  std::vector<std::vector<std::string>>(
+								  1, std::vector<std::string>(
+										 1, root->children.at(0)->symbol))));
+			} else {
+				size_t index =
+					global_arr_init.at(current_global_array).size() - 1;
+				global_arr_init.at(current_global_array)
+					.at(index)
+					.push_back(root->children.at(0)->symbol);
+			}
+		}
 		is_tilde_op.push(true);
 	} else if (root->children.at(0)->symbol == "OP_NEG") {
+		if (current_global_variable != "") {
+			if (global_var_init.count(current_global_variable)) {
+				global_var_init.at(current_global_variable)
+					.push_back(root->children.at(0)->symbol);
+			} else {
+				global_var_init.emplace(std::make_pair(
+					current_global_variable,
+					std::vector<std::string>(1, root->children.at(0)->symbol)));
+			}
+		}
+		if (current_global_array != "") {
+			if (!global_arr_init.count(current_global_array)) {
+				global_arr_init.emplace(
+					make_pair(current_global_array,
+							  std::vector<std::vector<std::string>>(
+								  1, std::vector<std::string>(
+										 1, root->children.at(0)->symbol))));
+			} else {
+				size_t index =
+					global_arr_init.at(current_global_array).size() - 1;
+				global_arr_init.at(current_global_array)
+					.at(index)
+					.push_back(root->children.at(0)->symbol);
+			}
+		}
 		is_not_op.push(true);
 	}
 	return 0;
@@ -784,6 +870,32 @@ int multiplikativni_izraz(std::shared_ptr<Node> root) {
 		} else if (!implicit_conversion(root->children.at(0)->type, "int")) {
 			return root->semantic_error();
 		} else {
+			if (current_global_variable != "") {
+				if (global_var_init.count(current_global_variable)) {
+					global_var_init.at(current_global_variable)
+						.push_back(root->children.at(1)->symbol);
+				} else {
+					global_var_init.emplace(
+						std::make_pair(current_global_variable,
+									   std::vector<std::string>(
+										   1, root->children.at(1)->symbol)));
+				}
+			}
+			if (current_global_array != "") {
+				if (!global_arr_init.count(current_global_array)) {
+					global_arr_init.emplace(make_pair(
+						current_global_array,
+						std::vector<std::vector<std::string>>(
+							1, std::vector<std::string>(
+								   1, root->children.at(1)->symbol))));
+				} else {
+					size_t index =
+						global_arr_init.at(current_global_array).size() - 1;
+					global_arr_init.at(current_global_array)
+						.at(index)
+						.push_back(root->children.at(1)->symbol);
+				}
+			}
 			if (cast_izraz(root->children.at(2))) {
 				return 1;
 			} else if (!implicit_conversion(root->children.at(2)->type,
@@ -840,6 +952,32 @@ int aditivni_izraz(std::shared_ptr<Node> root) {
 			if (!implicit_conversion(root->children.at(0)->type, "int")) {
 				return root->semantic_error();
 			} else {
+				if (current_global_variable != "") {
+					if (global_var_init.count(current_global_variable)) {
+						global_var_init.at(current_global_variable)
+							.push_back(root->children.at(1)->symbol);
+					} else {
+						global_var_init.emplace(std::make_pair(
+							current_global_variable,
+							std::vector<std::string>(
+								1, root->children.at(1)->symbol)));
+					}
+				}
+				if (current_global_array != "") {
+					if (!global_arr_init.count(current_global_array)) {
+						global_arr_init.emplace(make_pair(
+							current_global_array,
+							std::vector<std::vector<std::string>>(
+								1, std::vector<std::string>(
+									   1, root->children.at(1)->symbol))));
+					} else {
+						size_t index =
+							global_arr_init.at(current_global_array).size() - 1;
+						global_arr_init.at(current_global_array)
+							.at(index)
+							.push_back(root->children.at(1)->symbol);
+					}
+				}
 				if (multiplikativni_izraz(root->children.at(2))) {
 					return 1;
 				} else {
@@ -996,6 +1134,32 @@ int bin_i_izraz(std::shared_ptr<Node> root) {
 		} else if (!implicit_conversion(root->children.at(0)->type, "int")) {
 			return root->semantic_error();
 		} else {
+			if (current_global_variable != "") {
+				if (global_var_init.count(current_global_variable)) {
+					global_var_init.at(current_global_variable)
+						.push_back(root->children.at(1)->symbol);
+				} else {
+					global_var_init.emplace(
+						std::make_pair(current_global_variable,
+									   std::vector<std::string>(
+										   1, root->children.at(1)->symbol)));
+				}
+			}
+			if (current_global_array != "") {
+				if (!global_arr_init.count(current_global_array)) {
+					global_arr_init.emplace(make_pair(
+						current_global_array,
+						std::vector<std::vector<std::string>>(
+							1, std::vector<std::string>(
+								   1, root->children.at(1)->symbol))));
+				} else {
+					size_t index =
+						global_arr_init.at(current_global_array).size() - 1;
+					global_arr_init.at(current_global_array)
+						.at(index)
+						.push_back(root->children.at(1)->symbol);
+				}
+			}
 			if (jednakosni_izraz(root->children.at(2))) {
 				return 1;
 			} else if (!implicit_conversion(root->children.at(2)->type,
@@ -1043,6 +1207,32 @@ int bin_xili_izraz(std::shared_ptr<Node> root) {
 		} else if (!implicit_conversion(root->children.at(0)->type, "int")) {
 			return root->semantic_error();
 		} else {
+			if (current_global_variable != "") {
+				if (global_var_init.count(current_global_variable)) {
+					global_var_init.at(current_global_variable)
+						.push_back(root->children.at(1)->symbol);
+				} else {
+					global_var_init.emplace(
+						std::make_pair(current_global_variable,
+									   std::vector<std::string>(
+										   1, root->children.at(1)->symbol)));
+				}
+			}
+			if (current_global_array != "") {
+				if (!global_arr_init.count(current_global_array)) {
+					global_arr_init.emplace(make_pair(
+						current_global_array,
+						std::vector<std::vector<std::string>>(
+							1, std::vector<std::string>(
+								   1, root->children.at(1)->symbol))));
+				} else {
+					size_t index =
+						global_arr_init.at(current_global_array).size() - 1;
+					global_arr_init.at(current_global_array)
+						.at(index)
+						.push_back(root->children.at(1)->symbol);
+				}
+			}
 			if (bin_i_izraz(root->children.at(2))) {
 				return 1;
 			} else if (!implicit_conversion(root->children.at(2)->type,
@@ -1091,6 +1281,32 @@ int bin_ili_izraz(std::shared_ptr<Node> root) {
 		} else if (!implicit_conversion(root->children.at(0)->type, "int")) {
 			return root->semantic_error();
 		} else {
+			if (current_global_variable != "") {
+				if (global_var_init.count(current_global_variable)) {
+					global_var_init.at(current_global_variable)
+						.push_back(root->children.at(1)->symbol);
+				} else {
+					global_var_init.emplace(
+						std::make_pair(current_global_variable,
+									   std::vector<std::string>(
+										   1, root->children.at(1)->symbol)));
+				}
+			}
+			if (current_global_array != "") {
+				if (!global_arr_init.count(current_global_array)) {
+					global_arr_init.emplace(make_pair(
+						current_global_array,
+						std::vector<std::vector<std::string>>(
+							1, std::vector<std::string>(
+								   1, root->children.at(1)->symbol))));
+				} else {
+					size_t index =
+						global_arr_init.at(current_global_array).size() - 1;
+					global_arr_init.at(current_global_array)
+						.at(index)
+						.push_back(root->children.at(1)->symbol);
+				}
+			}
 			if (bin_xili_izraz(root->children.at(2))) {
 				return 1;
 			} else if (!implicit_conversion(root->children.at(2)->type,
@@ -1250,12 +1466,17 @@ int izraz_pridruzivanja(std::shared_ptr<Node> root) {
 						root->type = root->children.at(0)->type;
 						root->lhs = false;
 						for (std::string var : vars_to_update) {
-							std::cout << var << std::endl;
 							if (code_local_variables.count(var)) {
 								store_local_var(var);
 							} else if (code_global_variables.count(var)) {
 								store_global_var(var);
 							}
+							// it is possibly to update more then 1 variable and
+							// the first update will remove the element that is
+							// on top of the stack and put wrong values in other
+							// values, so after each update we push the value
+							// back to top of stack
+							return_to_stack(false);
 						}
 						vars_to_update.clear();
 
@@ -1265,6 +1486,10 @@ int izraz_pridruzivanja(std::shared_ptr<Node> root) {
 							} else if (code_global_arrays.count(arr.first)) {
 								store_global_arr(arr.first, arr.second);
 							}
+							// same principal as above but we have to send
+							// notice to function because we use different
+							// registers to save values in these cases
+							return_to_stack(true);
 						}
 						arrs_to_update.clear();
 					}
@@ -2215,8 +2440,12 @@ int init_deklarator(std::shared_ptr<Node> root) {
 				return root->semantic_error();
 			} else {
 				current_global_array = "";
+				current_global_variable = "";
 				if (block_count != 0) {
-					push_empty_var();
+					// variables with no initial value;
+					if (root->children.at(0)->children.size() == 1) {
+						push_empty_var();
+					}
 				}
 			}
 		}
@@ -2243,6 +2472,7 @@ int init_deklarator(std::shared_ptr<Node> root) {
 				return 1;
 			}
 			current_global_array = "";
+			current_global_variable = "";
 			if (is_array(root->children.at(0)->type)) {
 				if (!(root->children.at(2)->element_count <=
 					  root->children.at(0)->element_count)) {
@@ -2302,6 +2532,7 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 					code_global_variables.emplace(
 						std::make_pair(root->children.at(0)->value, next_name));
 				} else {
+					std::cout << function_arrays.size();
 					code_local_variables.emplace(std::make_pair(
 						root->children.at(0)->value,
 						(code_local_variables.size() + function_arrays.size()) *
@@ -2552,6 +2783,10 @@ int lista_izraza_pridruzivanja(std::shared_ptr<Node> root) {
 		if (lista_izraza_pridruzivanja(root->children.at(0))) {
 			return 1;
 		} else {
+			if (current_global_array != "") {
+				global_arr_init.at(current_global_array)
+					.push_back(std::vector<std::string>());
+			}
 			if (izraz_pridruzivanja(root->children.at(2))) {
 				return 1;
 			}

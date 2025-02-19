@@ -10,8 +10,10 @@ extern std::multimap<std::string, std::pair<std::string, int>>
 extern std::unordered_map<int, std::string> code_constants;
 extern std::unordered_map<std::string, std::string> code_functions;
 extern std::multimap<std::string, int> code_local_variables;
-extern std::unordered_map<std::string, int> global_var_init;
-extern std::unordered_map<std::string, std::vector<int>> global_arr_init;
+extern std::unordered_map<std::string, std::vector<std::string>>
+	global_var_init;
+extern std::unordered_map<std::string, std::vector<std::vector<std::string>>>
+	global_arr_init;
 extern std::vector<std::pair<std::string, bool>> increment_after;
 extern std::unordered_map<int, std::vector<std::pair<std::string, int>>>
 	for_var_update;
@@ -62,3 +64,4 @@ void send_arr(std::string name);
 void not_operator();
 void tilde_operator();
 void push_empty_var();
+void return_to_stack(bool array);

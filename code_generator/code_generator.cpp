@@ -1,4 +1,5 @@
 #include "code_generator.hpp"
+#include "evaluator.cpp"
 #include <cstdint>
 #include <fstream>
 #include <ios>
@@ -10,8 +11,9 @@ int local_stack = 0;
 std::ofstream code("a.frisc");
 std::unordered_map<std::string, std::string>
 	code_global_variables; // name -> address
-std::unordered_map<std::string, int> global_var_init;
-std::unordered_map<std::string, std::vector<int>> global_arr_init;
+std::unordered_map<std::string, std::vector<std::string>> global_var_init;
+std::unordered_map<std::string, std::vector<std::vector<std::string>>>
+	global_arr_init;
 std::multimap<std::string, std::pair<std::string, int>> code_global_arrays;
 std::unordered_map<int, std::string> code_constants;
 std::unordered_map<std::string, std::string> code_functions;
@@ -546,23 +548,35 @@ void fill_globals(void) {
 	code << std::dec;
 	for (auto x : code_global_variables) {
 		if (global_var_init.count(x.first)) {
-			code << x.second << "\tDW %D " << global_var_init.at(x.first)
-				 << std::endl;
+			for (auto x : global_var_init.at(x.first)) {
+				std::cout << x;
+			}
+			std::cout << std::endl;
+			code << x.second << "\tDW %D "
+				 << evaluate(global_var_init.at(x.first)) << std::endl;
 		} else {
 			code << x.second << std::endl;
 		}
 	}
 	for (auto x : code_global_arrays) {
 		if (global_arr_init.count(x.first)) {
+			for (auto x : global_arr_init.at(x.first)) {
+				for (auto y : x) {
+					std::cout << y << ' ';
+				}
+			}
+			std::cout << std::endl;
 			if (global_arr_init.at(x.first).size() > 0) {
 				code << x.second.first << "\tDW %D "
-					 << global_arr_init.at(x.first).at(0) << std::endl;
+					 << evaluate(global_arr_init.at(x.first).at(0))
+					 << std::endl;
 			} else {
 				code << x.second.first << std::endl;
 			}
 			for (size_t i = 1; i < x.second.second; ++i) {
 				if (global_arr_init.at(x.first).size() > i) {
-					code << "\tDW %D " << global_arr_init.at(x.first).at(i)
+					code << "\tDW %D "
+						 << evaluate(global_arr_init.at(x.first).at(i))
 						 << std::endl;
 				} else {
 					code << "\tDW %D  0" << std::endl;
@@ -583,4 +597,15 @@ void fill_consts(void) {
 		code << x.second << "\tDW %D " << x.first << std::endl;
 	}
 	code.close();
+}
+
+void return_to_stack(bool array) {
+	// dumb initial design if we are updating the element of array then we are
+	// saving the value in register R3, and if not then we are saving the value
+	// in register R0
+	if (array) {
+		code << "\tPUSH R3" << std::endl;
+	} else {
+		code << "\tPUSH R0" << std::endl;
+	}
 }
