@@ -111,6 +111,8 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 					updating_arrs.pop();
 				} else if (indexing_array) {
 					indexed_array = root->children.at(0)->value;
+				} else if (indexing_array == false && sending_params) {
+					send_function_arr(root->children.at(0)->value);
 				}
 			} else if (code_global_variables.count(
 						   root->children.at(0)->value)) {
@@ -1887,6 +1889,11 @@ int naredba_skoka(std::shared_ptr<Node> root) {
 		if (loop_depth < 1) {
 			return root->semantic_error();
 		}
+		if (root->children.at(0)->symbol == "KR_CONTINUE") {
+			loop_continue();
+		} else {
+			loop_break();
+		}
 	}
 	// <naredba_skoka> ::= KR_RETURN TOCKAZAREZ
 	else if (root->children.size() == 2 &&
@@ -2540,7 +2547,6 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 					code_global_variables.emplace(
 						std::make_pair(root->children.at(0)->value, next_name));
 				} else {
-					std::cout << function_arrays.size();
 					code_local_variables.emplace(std::make_pair(
 						root->children.at(0)->value,
 						(code_local_variables.size() + function_arrays.size()) *

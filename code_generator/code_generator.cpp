@@ -25,6 +25,7 @@ std::unordered_map<std::string, int> function_arrays;
 int logical_skip = 0;
 int skip_count = 0;
 int loop_counter = 0;
+int break_counter = 0;
 int mod_op = 0;
 int div_op = 0;
 int mul_op = 0;
@@ -288,6 +289,13 @@ void send_arr(std::string name) {
 		 << ", R0" << std::endl;
 	code << "\tPUSH R0" << std::endl;
 }
+void send_function_arr(std::string name) {
+	int offset = function_arrays.at(name);
+	code << "\tLOAD R0, " << "(R2-0" << std::hex << std::uppercase << offset
+		 << ')' << std::endl;
+	code << std::dec;
+	code << "\tPUSH R0" << std::endl;
+}
 
 void equal_comparison(bool eq) {
 	code << std::dec;
@@ -411,6 +419,9 @@ void variable_increment_after(void) {
 	increment_after.clear();
 }
 
+void loop_break(void) { code << "\tJP BR" << break_counter << std::endl; }
+void loop_continue(void) {}
+
 void while_start(void) { code << "L" << loop_counter << std::endl; }
 void while_check(void) {
 	code << "\tPOP R0" << std::endl;
@@ -420,6 +431,7 @@ void while_check(void) {
 void while_end(void) {
 	code << "\tJP L" << loop_counter << std::endl;
 	code << "E" << loop_counter++ << std::endl;
+	code << "BR" << break_counter++ << std::endl;
 }
 void forc_start(void) {
 	code << "L" << loop_counter << std::endl;
@@ -451,6 +463,7 @@ void forc_end(void) {
 	code << "E" << loop_counter++ << "\tMOVE %D 2, R5" << std::endl;
 	code << "\tJP I" << for_loop_skip << std::endl;
 	code << "AE" << for_loop_skip++ << std::endl;
+	code << "BR" << break_counter++ << std::endl;
 }
 
 void load_ret_val(void) { code << "\tPOP R6" << std::endl; }
@@ -548,10 +561,6 @@ void fill_globals(void) {
 	code << std::dec;
 	for (auto x : code_global_variables) {
 		if (global_var_init.count(x.first)) {
-			for (auto x : global_var_init.at(x.first)) {
-				std::cout << x;
-			}
-			std::cout << std::endl;
 			code << x.second << "\tDW %D "
 				 << evaluate(global_var_init.at(x.first)) << std::endl;
 		} else {
@@ -560,12 +569,6 @@ void fill_globals(void) {
 	}
 	for (auto x : code_global_arrays) {
 		if (global_arr_init.count(x.first)) {
-			for (auto x : global_arr_init.at(x.first)) {
-				for (auto y : x) {
-					std::cout << y << ' ';
-				}
-			}
-			std::cout << std::endl;
 			if (global_arr_init.at(x.first).size() > 0) {
 				code << x.second.first << "\tDW %D "
 					 << evaluate(global_arr_init.at(x.first).at(0))

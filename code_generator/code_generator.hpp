@@ -67,3 +67,6 @@ void push_empty_var(void);
 void return_to_stack(bool array);
 void skip_start(void);
 void skip_end(void);
+void send_function_arr(std::string name);
+void loop_continue(void);
+void loop_break(void);
