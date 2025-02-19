@@ -617,3 +617,12 @@ void return_to_stack(bool array) {
 
 void skip_start(void) { code << "\tJP SK" << skip_count << std::endl; }
 void skip_end(void) { code << "SK" << skip_count++ << std::endl; }
+
+void arr_init(std::string name, int index) {
+	code << "\tPOP R0" << std::endl;
+	code << "\tMOVE "
+		 << std::prev(code_global_arrays.equal_range(name).second)->second.first
+		 << ", R1" << std::endl;
+	code << "\tADD R1, %D " << index * 4 << ", R1 " << std::endl;
+	code << "\tSTORE R0, (R1)" << std::endl;
+}

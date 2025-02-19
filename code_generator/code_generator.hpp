@@ -71,3 +71,4 @@ void send_function_arr(std::string name);
 void loop_continue(void);
 void loop_break(void);
 void inf_loop(void);
+void arr_init(std::string name, int index);

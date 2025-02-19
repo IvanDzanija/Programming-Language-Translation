@@ -80,7 +80,7 @@ int evaluate(const std::vector<std::string> &expr) {
 			if (isOperator(token)) { // Operator
 				if (isUnary(token)) {
 					if (values.empty())
-						throw std::runtime_error("Invalid expression");
+						return 0;
 					int val = values.top();
 					values.pop();
 					if (token == "OP_TILDA")
@@ -89,7 +89,7 @@ int evaluate(const std::vector<std::string> &expr) {
 						values.push(!val);
 				} else {
 					if (values.size() < 2)
-						throw std::runtime_error("Invalid expression");
+						return 0;
 					int b = values.top();
 					values.pop();
 					int a = values.top();
@@ -117,6 +117,6 @@ int evaluate(const std::vector<std::string> &expr) {
 	}
 
 	if (values.size() != 1)
-		throw std::runtime_error("Invalid expression");
+		return 0;
 	return values.top();
 }

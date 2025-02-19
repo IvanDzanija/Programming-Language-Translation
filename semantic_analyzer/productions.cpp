@@ -47,6 +47,7 @@ std::stack<bool> updating_arrs;
 std::vector<std::string> vars_to_update;
 std::vector<std::pair<std::string, int>> arrs_to_update;
 bool sending_params;
+int current_index = 0;
 
 bool incrementing = false;
 
@@ -1993,7 +1994,7 @@ int vanjska_deklaracija(std::shared_ptr<Node> root) {
 	return 0;
 }
 
-// possibly void funcs have no return ;
+// possibly void funcs have no return
 int definicija_funkcije(std::shared_ptr<Node> root) {
 	// <definicija_funkcije> ::= <ime_tipa> IDN L_ZAGRADA KR_VOID D_ZAGRADA
 	// <slozena_naredba>
@@ -2484,15 +2485,15 @@ int init_deklarator(std::shared_ptr<Node> root) {
 		if (izravni_deklarator(root->children.at(0))) {
 			return 1;
 		} else {
-			if (current_global_array != "") {
-				skip_start();
-			}
+			// if (current_global_array != "") {
+			// 	skip_start();
+			// }
 			if (inicijalizator(root->children.at(2))) {
 				return 1;
 			}
-			if (current_global_array != "") {
-				skip_end();
-			}
+			// if (current_global_array != "") {
+			// 	skip_end();
+			// }
 			current_global_array = "";
 			current_global_variable = "";
 			if (is_array(root->children.at(0)->type)) {
@@ -2575,6 +2576,7 @@ int izravni_deklarator(std::shared_ptr<Node> root) {
 		// 2. IDN.ime nije deklarirano u lokalnom djelokrugu
 		// 3. BROJ.vrijednost je pozitivan broj (> 0) ne veci od 1024
 		// 4. zabiljezi deklaraciju IDN.ime s odgovarajucim tipom
+		current_index = 0;
 		if (root->inherited_type == "void") {
 			return root->semantic_error();
 		} else {
@@ -2787,6 +2789,14 @@ int lista_izraza_pridruzivanja(std::shared_ptr<Node> root) {
 		if (izraz_pridruzivanja(root->children.at(0))) {
 			return 1;
 		}
+		if (current_global_array != "") {
+			if (!global_arr_init.count(current_global_array)) {
+				global_arr_init.emplace(std::make_pair(
+					current_global_array, std::vector<std::vector<std::string>>(
+											  1, std::vector<std::string>())));
+			}
+			arr_init(current_global_array, current_index);
+		}
 		root->arg_types.push_back(root->children.at(0)->type);
 		root->element_count = 1;
 	}
@@ -2805,11 +2815,28 @@ int lista_izraza_pridruzivanja(std::shared_ptr<Node> root) {
 			return 1;
 		} else {
 			if (current_global_array != "") {
-				global_arr_init.at(current_global_array)
-					.push_back(std::vector<std::string>());
+				if (global_arr_init.count(current_global_array)) {
+					global_arr_init.at(current_global_array)
+						.push_back(std::vector<std::string>(1, std::string()));
+				} else {
+					global_arr_init.emplace(
+						std::make_pair(current_global_array,
+									   std::vector<std::vector<std::string>>(
+										   1, std::vector<std::string>())));
+				}
 			}
+			++current_index;
 			if (izraz_pridruzivanja(root->children.at(2))) {
 				return 1;
+			}
+			if (current_global_array != "") {
+				if (!global_arr_init.count(current_global_array)) {
+					global_arr_init.emplace(
+						std::make_pair(current_global_array,
+									   std::vector<std::vector<std::string>>(
+										   1, std::vector<std::string>())));
+				}
+				arr_init(current_global_array, current_index);
 			}
 			root->arg_types = root->children.at(0)->arg_types;
 			root->arg_types.push_back(root->children.at(2)->type);
