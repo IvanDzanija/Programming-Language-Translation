@@ -6,8 +6,6 @@
 #include <iostream>
 #include <unordered_map>
 
-int logical_skip = 0;
-int local_stack = 0;
 std::ofstream code("a.frisc");
 std::unordered_map<std::string, std::string>
 	code_global_variables; // name -> address
@@ -24,6 +22,8 @@ std::unordered_map<int, std::vector<std::pair<std::string, int>>>
 	for_var_update;
 std::unordered_map<std::string, int> function_arrays;
 
+int logical_skip = 0;
+int skip_count = 0;
 int loop_counter = 0;
 int mod_op = 0;
 int div_op = 0;
@@ -391,7 +391,7 @@ void variable_increment_before(std::string var, bool plus) {
 	load_var(var);
 }
 
-void variable_increment_after() {
+void variable_increment_after(void) {
 	code << std::dec;
 	for (std::pair<std::string, int> var : increment_after) {
 		load_var(var.first);
@@ -411,32 +411,32 @@ void variable_increment_after() {
 	increment_after.clear();
 }
 
-void while_start() { code << "L" << loop_counter << std::endl; }
-void while_check() {
+void while_start(void) { code << "L" << loop_counter << std::endl; }
+void while_check(void) {
 	code << "\tPOP R0" << std::endl;
 	code << "\tCMP R0, 0" << std::endl;
 	code << "\tJP_EQ E" << loop_counter << std::endl;
 }
-void while_end() {
+void while_end(void) {
 	code << "\tJP L" << loop_counter << std::endl;
 	code << "E" << loop_counter++ << std::endl;
 }
-void forc_start() {
+void forc_start(void) {
 	code << "L" << loop_counter << std::endl;
 	code << "\tMOVE %D 0, R5" << std::endl;
 }
 
-void forc_check() {
+void forc_check(void) {
 	code << "\tPOP R0" << std::endl;
 	code << "\tCMP R0, 0" << std::endl;
 	code << "\tJP_EQ E" << loop_counter << std::endl;
 }
-void forc_skip_first() {
+void forc_skip_first(void) {
 	code << "I" << for_loop_skip << std::endl;
 	code << "\tCMP R5, 0" << std::endl;
 	code << "\tJP_EQ K" << for_loop_skip << std::endl;
 }
-void forc_skip_second() {
+void forc_skip_second(void) {
 	code << "\tCMP R5, 1" << std::endl;
 	code << "\tJP_EQ J" << for_loop_skip << std::endl;
 	code << "\tCMP R5, 2" << std::endl;
@@ -444,7 +444,7 @@ void forc_skip_second() {
 	code << "K" << for_loop_skip << std::endl;
 }
 
-void forc_end() {
+void forc_end(void) {
 	code << "\tMOVE %D 1, R5" << std::endl;
 	code << "\tJP I" << for_loop_skip << std::endl;
 	code << "J" << for_loop_skip << "\tJP L" << loop_counter << std::endl;
@@ -609,3 +609,6 @@ void return_to_stack(bool array) {
 		code << "\tPUSH R0" << std::endl;
 	}
 }
+
+void skip_start(void) { code << "\tJP SK" << skip_count << std::endl; }
+void skip_end(void) { code << "SK" << skip_count++ << std::endl; }

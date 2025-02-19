@@ -37,10 +37,7 @@ for it in sorted(items):
         ["diff", "-w", "frisc.out", "test.out"], text=True, capture_output=True
     )
     file1 = open("frisc.out")
-    print(file1.read())
     file2 = open("test.out")
-    print(file2.read())
-    print(out.stdout)
     if out.stdout == "":
         print(GREEN + f"TEST {it} PASSED" + RESET)
         cr += 1

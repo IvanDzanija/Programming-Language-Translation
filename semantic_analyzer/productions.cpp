@@ -105,13 +105,12 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 					}
 				}
 			} else if (function_arrays.count(root->children.at(0)->value)) {
-				if (indexing_array) {
-					indexed_array = root->children.at(0)->value;
-				}
 				if (!updating_arrs.empty()) {
 					arrs_to_update.push_back(
 						std::make_pair(root->children.at(0)->value, 0));
 					updating_arrs.pop();
+				} else if (indexing_array) {
+					indexed_array = root->children.at(0)->value;
 				}
 			} else if (code_global_variables.count(
 						   root->children.at(0)->value)) {
@@ -265,7 +264,9 @@ int primarni_izraz(std::shared_ptr<Node> root) {
 					.push_back(std::to_string(temp));
 			}
 		}
-
+		if (!updating_vars.empty()) {
+			updating_vars.pop();
+		}
 	}
 	// <primarni_izraz> ::= ZNAK
 	// tip ← char
@@ -444,6 +445,7 @@ int postfiks_izraz(std::shared_ptr<Node> root) {
 						root->lhs = !(is_const(X));
 						if (indexed_array != "") {
 							load_array(indexed_array);
+							indexed_array = "";
 						}
 						indexing_array = false;
 					}
@@ -2468,8 +2470,14 @@ int init_deklarator(std::shared_ptr<Node> root) {
 		if (izravni_deklarator(root->children.at(0))) {
 			return 1;
 		} else {
+			if (current_global_array != "") {
+				skip_start();
+			}
 			if (inicijalizator(root->children.at(2))) {
 				return 1;
+			}
+			if (current_global_array != "") {
+				skip_end();
 			}
 			current_global_array = "";
 			current_global_variable = "";
