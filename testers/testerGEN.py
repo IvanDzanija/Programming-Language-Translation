@@ -55,6 +55,7 @@ for it in sorted(items):
     subprocess.run(["rm", "test.out"])
     subprocess.run(["rm", "test.in"])
     subprocess.run(["rm", "a.frisc"])
+    subprocess.run(["rm", "frisc.out"])
     os.chdir(cwd)
 
 if cr / ts < 0.3:

@@ -8,28 +8,43 @@ RED = "\033[31m"
 BLUE = "\033[34m"
 GREEN = "\033[32m"
 
-semdir = input("Unesit ime direktorija gdje vam je kod: ")
+semdir = "./"
 
 cwd = os.getcwd()
-test = cwd + "/integration"
+test = cwd + "/../semantic_analyzer/integration"
 os.chdir(test)
 items = os.listdir()
 os.chdir(cwd)
 ts, cr = 0, 0
-for it in items:
+for it in sorted(items):
+    if ".DS_Store" in it:
+        continue
     ts += 1
     print(BLUE + f"TESTING {it}" + RESET)
-    subprocess.run(["cp", "integration/" + it + "/test.in", semdir + "/"])
-    subprocess.run(["cp", "integration/" + it + "/test.out", semdir + "/"])
+    subprocess.run(
+        ["cp", "../semantic_analyzer/integration/" + it + "/test.in", semdir + "/"]
+    )
+    subprocess.run(
+        ["cp", "../semantic_analyzer/integration/" + it + "/test.out", semdir + "/"]
+    )
     nd = cwd + "/" + semdir
     os.chdir(nd)
     file = open("test.in", "r")
     file2 = open("izlaz.txt", "w")
     subprocess.run(
-        ["./analizator"], stdin=file, stdout=file2, stderr=subprocess.DEVNULL
+        ["../semantic_analyzer/analizator"],
+        stdin=file,
+        stdout=file2,
+        stderr=subprocess.DEVNULL,
     )
     file.close()
     file2.close()
+    # file1 = open("test.out")
+    # file2 = open("izlaz.txt")
+    # print(file1.read())
+    # print(file2.read())
+    # file1.close()
+    # file2.close()
     out = subprocess.run(
         ["diff", "izlaz.txt", "test.out"], text=True, capture_output=True
     )
@@ -42,6 +57,7 @@ for it in items:
     subprocess.run(["rm", "izlaz.txt"])
     subprocess.run(["rm", "test.out"])
     subprocess.run(["rm", "test.in"])
+    subprocess.run(["rm", "a.frisc"])
     os.chdir(cwd)
 
 if cr / ts < 0.3:
