@@ -1,6 +1,6 @@
 # Programming-Language-Translation
 ## About - Laboratory exercise @Uni-ZG FER for PLT(PPJ) class  
-Software implementation of specific parts of a compiler or a compiler in general.<br> 
+Software implementation of compiler for a subset of C language.<br> 
 ### Major phases of analysis: 
 - [lexical](/lexical_analyzer)
 - [syntax](/syntax_analyzer)
